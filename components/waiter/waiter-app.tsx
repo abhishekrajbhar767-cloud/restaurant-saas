@@ -21,9 +21,6 @@ export function WaiterApp({
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
 
-  // Realtime: new pending requests (Smart Waiter Ping), status changes on
-  // requests (a claim landing — everyone else's Accept button disappears),
-  // and this waiter's own availability (kept in sync across their devices).
   useEffect(() => {
     const supabase = createClient();
 
@@ -34,7 +31,7 @@ export function WaiterApp({
         { event: 'INSERT', schema: 'public', table: 'service_requests', filter: `restaurant_id=eq.${restaurantId}` },
         async (payload) => {
           const req = payload.new as ServiceRequest;
-          const { data: table } = await supabase.from('tables').select('table_number').eq('id', req.table_id).maybeSingle();
+          const { data: table } = await supabase.from('tables').select('table_number').eq('id', req.table_id).maybeSingle().returns<{ table_number: string }>();
           setRequests((prev) => [...prev, { ...req, table_number: table?.table_number ?? '—' }]);
         }
       )

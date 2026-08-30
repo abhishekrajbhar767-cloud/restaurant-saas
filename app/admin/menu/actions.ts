@@ -6,12 +6,6 @@ import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import type { FoodType } from '@/types/database';
 
-// Every mutation below re-derives restaurant_id from the caller's own active
-// membership (requireRole → ctx.tenantMembership.restaurant.id) and filters
-// every write by it — never from a hidden form field. RLS backs this up
-// independently, but scoping the query itself means a bug here fails closed
-// (touches zero rows) rather than relying on RLS alone to catch it.
-
 async function requireTenant() {
   const ctx = await requireRole(['owner', 'manager']);
   const restaurantId = ctx.tenantMembership?.restaurant.id;
@@ -34,7 +28,8 @@ export async function addCategory(formData: FormData) {
     .select('sort_order')
     .eq('restaurant_id', restaurantId)
     .order('sort_order', { ascending: false })
-    .limit(1);
+    .limit(1)
+    .returns<{ sort_order: number }[]>();
 
   const nextSortOrder = (existing?.[0]?.sort_order ?? 0) + 1;
 
@@ -85,7 +80,8 @@ export async function moveCategory(categoryId: string, direction: 'up' | 'down')
     .from('menu_categories')
     .select('id, sort_order')
     .eq('restaurant_id', restaurantId)
-    .order('sort_order', { ascending: true });
+    .order('sort_order', { ascending: true })
+    .returns<{ id: string; sort_order: number }[]>();
   if (error || !categories) throw new Error('Could not load categories.');
 
   const index = categories.findIndex((c) => c.id === categoryId);
@@ -158,7 +154,8 @@ export async function addItem(formData: FormData) {
     .eq('restaurant_id', restaurantId)
     .eq('category_id', parsed.data.categoryId)
     .order('sort_order', { ascending: false })
-    .limit(1);
+    .limit(1)
+    .returns<{ sort_order: number }[]>();
 
   const nextSortOrder = (existing?.[0]?.sort_order ?? 0) + 1;
 
@@ -238,7 +235,8 @@ export async function moveItem(itemId: string, categoryId: string, direction: 'u
     .select('id, sort_order')
     .eq('restaurant_id', restaurantId)
     .eq('category_id', categoryId)
-    .order('sort_order', { ascending: true });
+    .order('sort_order', { ascending: true })
+    .returns<{ id: string; sort_order: number }[]>();
   if (error || !items) throw new Error('Could not load items.');
 
   const index = items.findIndex((i) => i.id === itemId);

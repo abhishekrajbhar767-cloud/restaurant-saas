@@ -22,8 +22,8 @@ export default async function OrderTrackingPage({
 
   const [{ data: orderItems }, { data: restaurant }, { data: table }] = await Promise.all([
     supabase.from('order_items').select('*').eq('order_id', order.id),
-    supabase.from('restaurants').select('name, currency').eq('id', order.restaurant_id).maybeSingle(),
-    supabase.from('tables').select('id, table_number').eq('id', order.table_id).maybeSingle(),
+    supabase.from('restaurants').select('name, currency').eq('id', order.restaurant_id).maybeSingle().returns<{ name: string; currency: string }>(),
+    supabase.from('tables').select('id, table_number').eq('id', order.table_id).maybeSingle().returns<{ id: string; table_number: string }>(),
   ]);
 
   return (

@@ -15,10 +15,6 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
   const ordersRef = useRef(orders);
   ordersRef.current = orders;
 
-  // Realtime is the ONLY way this board learns about new/changed orders —
-  // no setTimeout, no polling. New INSERTs need a follow-up fetch for their
-  // items (the INSERT payload only carries the orders row); UPDATEs merge
-  // in place since order_items never change after creation.
   useEffect(() => {
     const supabase = createClient();
 
@@ -31,7 +27,7 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
           const newOrder = payload.new as Order;
           const [{ data: items }, { data: table }] = await Promise.all([
             supabase.from('order_items').select('*').eq('order_id', newOrder.id),
-            supabase.from('tables').select('table_number').eq('id', newOrder.table_id).maybeSingle(),
+            supabase.from('tables').select('table_number').eq('id', newOrder.table_id).maybeSingle().returns<{ table_number: string }>(),
           ]);
           setOrders((prev) => [...prev, { ...newOrder, items: items ?? [], table_number: table?.table_number ?? '—' }]);
         }
@@ -55,9 +51,6 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
   const preparingOrders = orders.filter((o) => o.status === 'accepted' || o.status === 'preparing');
   const readyOrders = orders.filter((o) => o.status === 'ready');
 
-  // A single shared loop, never one per order — start()/stop() are both
-  // idempotent (see use-alert-sound.ts), so this effect can fire on every
-  // newOrders.length change without ever stacking intervals.
   useEffect(() => {
     if (shiftActive && newOrders.length > 0) {
       sound.start();
@@ -69,7 +62,7 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
   useEffect(() => () => sound.stop(), [sound]);
 
   function handleStartShift() {
-    sound.unlock(); // must happen synchronously inside this click handler
+    sound.unlock();
     setShiftActive(true);
   }
 
