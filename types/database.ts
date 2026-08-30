@@ -2,6 +2,11 @@
 // Hand-written to mirror supabase/migrations exactly. If you regenerate this
 // with `supabase gen types typescript`, keep the RPC (Functions) section —
 // the generator doesn't always pick up custom composite input types cleanly.
+//
+// NOTE: Every row type must be a `type` alias, not an `interface`. supabase-js
+// requires Row/Insert/Update to be assignable to Record<string, unknown>, and
+// TypeScript only gives implicit index signatures to type aliases — interfaces
+// fail that check, which makes the whole generic Schema resolve to `never`.
 
 export type RestaurantStatus = 'active' | 'suspended' | 'archived';
 export type MemberRole = 'super_admin' | 'owner' | 'manager' | 'kitchen' | 'waiter';
@@ -11,7 +16,7 @@ export type ServiceRequestType = 'waiter' | 'water' | 'bill';
 export type ServiceRequestStatus = 'pending' | 'claimed' | 'resolved' | 'cancelled';
 export type WaiterAvailability = 'free' | 'busy' | 'offline';
 
-export interface Restaurant {
+export type Restaurant = {
   id: string;
   name: string;
   slug: string;
@@ -21,9 +26,9 @@ export interface Restaurant {
   status: RestaurantStatus;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface RestaurantMember {
+export type RestaurantMember = {
   id: string;
   restaurant_id: string | null;
   user_id: string;
@@ -33,18 +38,18 @@ export interface RestaurantMember {
   phone: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface RestaurantTable {
+export type RestaurantTable = {
   id: string;
   restaurant_id: string;
   table_number: string;
   qr_token: string;
   is_active: boolean;
   created_at: string;
-}
+};
 
-export interface MenuCategory {
+export type MenuCategory = {
   id: string;
   restaurant_id: string;
   name: string;
@@ -52,9 +57,9 @@ export interface MenuCategory {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface MenuItem {
+export type MenuItem = {
   id: string;
   restaurant_id: string;
   category_id: string;
@@ -68,9 +73,9 @@ export interface MenuItem {
   sort_order: number;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface Order {
+export type Order = {
   id: string;
   restaurant_id: string;
   table_id: string;
@@ -85,9 +90,9 @@ export interface Order {
   ready_at: string | null;
   served_at: string | null;
   cancelled_at: string | null;
-}
+};
 
-export interface OrderItem {
+export type OrderItem = {
   id: string;
   order_id: string;
   menu_item_id: string | null;
@@ -96,9 +101,9 @@ export interface OrderItem {
   quantity: number;
   special_instructions: string | null;
   created_at: string;
-}
+};
 
-export interface ServiceRequest {
+export type ServiceRequest = {
   id: string;
   restaurant_id: string;
   table_id: string;
@@ -108,22 +113,22 @@ export interface ServiceRequest {
   created_at: string;
   claimed_at: string | null;
   resolved_at: string | null;
-}
+};
 
-export interface WaiterStatusRow {
+export type WaiterStatusRow = {
   member_id: string;
   restaurant_id: string;
   availability: WaiterAvailability;
   updated_at: string;
-}
+};
 
-export interface OrderLineInput {
+export type OrderLineInput = {
   menu_item_id: string;
   quantity: number;
   special_instructions?: string | null;
-}
+};
 
-export interface PlatformStats {
+export type PlatformStats = {
   total_restaurants: number;
   active_restaurants: number;
   suspended_restaurants: number;
@@ -132,9 +137,9 @@ export interface PlatformStats {
   total_revenue: number;
   active_staff: number;
   active_tables: number;
-}
+};
 
-export interface RestaurantOverviewRow {
+export type RestaurantOverviewRow = {
   restaurant_id: string;
   name: string;
   slug: string;
@@ -145,9 +150,9 @@ export interface RestaurantOverviewRow {
   table_count: number;
   staff_count: number;
   today_order_count: number;
-}
+};
 
-export interface RestaurantStaffRow {
+export type RestaurantStaffRow = {
   member_id: string;
   role: MemberRole;
   display_name: string | null;
@@ -156,9 +161,9 @@ export interface RestaurantStaffRow {
   email: string;
   created_at: string;
   availability: WaiterAvailability | null;
-}
+};
 
-export interface RestaurantStats {
+export type RestaurantStats = {
   total_orders: number;
   today_orders: number;
   total_revenue: number;
@@ -169,16 +174,16 @@ export interface RestaurantStats {
   pending_service_requests: number;
   preparing_orders: number;
   ready_orders: number;
-}
+};
 
-export interface OrderWithItems extends Order {
+export type OrderWithItems = Order & {
   items: OrderItem[];
   table_number: string;
-}
+};
 
-export interface ServiceRequestWithTable extends ServiceRequest {
+export type ServiceRequestWithTable = ServiceRequest & {
   table_number: string;
-}
+};
 
 export type Database = {
   public: {
@@ -207,7 +212,9 @@ export type Database = {
       get_restaurant_staff: { Args: { p_restaurant_id: string }; Returns: RestaurantStaffRow[] };
       get_restaurant_stats: { Args: { p_restaurant_id: string }; Returns: RestaurantStats };
     };
-    Views: Record<string, never>;
+    Views: {
+      [_ in never]: never;
+    };
     Enums: {
       restaurant_status: RestaurantStatus;
       member_role: MemberRole;
@@ -217,6 +224,8 @@ export type Database = {
       service_request_status: ServiceRequestStatus;
       waiter_availability: WaiterAvailability;
     };
-    CompositeTypes: Record<string, never>;
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
 };
