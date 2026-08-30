@@ -180,7 +180,7 @@ export interface ServiceRequestWithTable extends ServiceRequest {
   table_number: string;
 }
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       restaurants: { Row: Restaurant; Insert: Partial<Restaurant>; Update: Partial<Restaurant>; Relationships: [] };
@@ -219,4 +219,4 @@ export interface Database {
     };
     CompositeTypes: Record<string, never>;
   };
-}
+};
