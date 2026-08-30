@@ -100,7 +100,7 @@ begin
     (v_urban_id, v_urban_cat_drinks, 'Masala Chaas', 'Spiced buttermilk', 70, 'veg', 3, 2),
     (v_urban_id, v_urban_cat_drinks, 'Mango Lassi', 'Yoghurt, alphonso mango', 110, 'veg', 4, 3),
     (v_urban_id, v_urban_cat_drinks, 'Filter Coffee', 'South Indian style', 60, 'veg', 5, 4)
-  returning id into v_urban_item_paneer; -- captures last insert id (Paneer Tikka is first, this is fine, only used illustratively below)
+   ; -- captures last insert id (Paneer Tikka is first, this is fine, only used illustratively below)
 
   select id into v_urban_item_butter_chicken from public.menu_items where restaurant_id = v_urban_id and name = 'Butter Chicken';
   select id into v_urban_item_naan from public.menu_items where restaurant_id = v_urban_id and name = 'Garlic Naan';
