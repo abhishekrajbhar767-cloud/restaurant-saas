@@ -183,15 +183,15 @@ export interface ServiceRequestWithTable extends ServiceRequest {
 export interface Database {
   public: {
     Tables: {
-      restaurants: { Row: Restaurant; Insert: Partial<Restaurant>; Update: Partial<Restaurant> };
-      restaurant_members: { Row: RestaurantMember; Insert: Partial<RestaurantMember>; Update: Partial<RestaurantMember> };
-      tables: { Row: RestaurantTable; Insert: Partial<RestaurantTable>; Update: Partial<RestaurantTable> };
-      menu_categories: { Row: MenuCategory; Insert: Partial<MenuCategory>; Update: Partial<MenuCategory> };
-      menu_items: { Row: MenuItem; Insert: Partial<MenuItem>; Update: Partial<MenuItem> };
-      orders: { Row: Order; Insert: Partial<Order>; Update: Partial<Order> };
-      order_items: { Row: OrderItem; Insert: Partial<OrderItem>; Update: Partial<OrderItem> };
-      service_requests: { Row: ServiceRequest; Insert: Partial<ServiceRequest>; Update: Partial<ServiceRequest> };
-      waiter_status: { Row: WaiterStatusRow; Insert: Partial<WaiterStatusRow>; Update: Partial<WaiterStatusRow> };
+      restaurants: { Row: Restaurant; Insert: Partial<Restaurant>; Update: Partial<Restaurant>; Relationships: [] };
+      restaurant_members: { Row: RestaurantMember; Insert: Partial<RestaurantMember>; Update: Partial<RestaurantMember>; Relationships: [] };
+      tables: { Row: RestaurantTable; Insert: Partial<RestaurantTable>; Update: Partial<RestaurantTable>; Relationships: [] };
+      menu_categories: { Row: MenuCategory; Insert: Partial<MenuCategory>; Update: Partial<MenuCategory>; Relationships: [] };
+      menu_items: { Row: MenuItem; Insert: Partial<MenuItem>; Update: Partial<MenuItem>; Relationships: [] };
+      orders: { Row: Order; Insert: Partial<Order>; Update: Partial<Order>; Relationships: [] };
+      order_items: { Row: OrderItem; Insert: Partial<OrderItem>; Update: Partial<OrderItem>; Relationships: [] };
+      service_requests: { Row: ServiceRequest; Insert: Partial<ServiceRequest>; Update: Partial<ServiceRequest>; Relationships: [] };
+      waiter_status: { Row: WaiterStatusRow; Insert: Partial<WaiterStatusRow>; Update: Partial<WaiterStatusRow>; Relationships: [] };
     };
     Functions: {
       create_order: { Args: { p_qr_token: string; p_lines: OrderLineInput[] }; Returns: string };
@@ -207,5 +207,16 @@ export interface Database {
       get_restaurant_staff: { Args: { p_restaurant_id: string }; Returns: RestaurantStaffRow[] };
       get_restaurant_stats: { Args: { p_restaurant_id: string }; Returns: RestaurantStats };
     };
+    Views: Record<string, never>;
+    Enums: {
+      restaurant_status: RestaurantStatus;
+      member_role: MemberRole;
+      food_type: FoodType;
+      order_status: OrderStatus;
+      service_request_type: ServiceRequestType;
+      service_request_status: ServiceRequestStatus;
+      waiter_availability: WaiterAvailability;
+    };
+    CompositeTypes: Record<string, never>;
   };
 }
