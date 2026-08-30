@@ -94,6 +94,7 @@ export async function moveCategory(categoryId: string, direction: 'up' | 'down')
 
   const current = categories[index];
   const swap = categories[swapIndex];
+  if (!current || !swap) return;
 
   await Promise.all([
     supabase.from('menu_categories').update({ sort_order: swap.sort_order }).eq('id', current.id).eq('restaurant_id', restaurantId),
@@ -246,6 +247,7 @@ export async function moveItem(itemId: string, categoryId: string, direction: 'u
 
   const current = items[index];
   const swap = items[swapIndex];
+  if (!current || !swap) return;
 
   await Promise.all([
     supabase.from('menu_items').update({ sort_order: swap.sort_order }).eq('id', current.id).eq('restaurant_id', restaurantId),
