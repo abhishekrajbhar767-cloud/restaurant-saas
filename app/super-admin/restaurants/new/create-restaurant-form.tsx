@@ -119,7 +119,7 @@ export function CreateRestaurantForm() {
       <fieldset className="space-y-4">
         <legend className="font-display font-bold text-sm uppercase tracking-wide text-amber mb-1">Owner</legend>
         <p className="text-xs text-text-muted -mt-2">
-          They&apos;ll receive an email invite to set a password and sign in at <span className="font-mono">/admin</span>.
+          Their account is created instantly with this password — they can sign in right away at <span className="font-mono">/admin</span>.
         </p>
 
         <div className="grid sm:grid-cols-2 gap-4">
@@ -135,6 +135,22 @@ export function CreateRestaurantForm() {
             </label>
             <input id="ownerEmail" name="ownerEmail" type="email" required className="field-input" placeholder="owner@restaurant.com" />
           </div>
+        </div>
+
+        <div className="sm:w-1/2">
+          <label htmlFor="ownerPassword" className="field-label">
+            Owner password
+          </label>
+          <input
+            id="ownerPassword"
+            name="ownerPassword"
+            type="text"
+            required
+            minLength={6}
+            autoComplete="new-password"
+            className="field-input font-mono"
+            placeholder="min 6 characters"
+          />
         </div>
 
         <div className="sm:w-1/2">

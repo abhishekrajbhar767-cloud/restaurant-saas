@@ -25,6 +25,7 @@ const CreateRestaurantSchema = z.object({
   slug: z.string().min(2, 'Slug is required'),
   ownerName: z.string().min(2, "Owner's name is required"),
   ownerEmail: z.string().email('Enter a valid email address'),
+  ownerPassword: z.string().min(6, 'Owner password must be at least 6 characters'),
   ownerPhone: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
   timezone: z.string().min(1, 'Timezone is required'),
@@ -46,6 +47,7 @@ export async function createRestaurant(_prev: CreateRestaurantState, formData: F
     slug: slugify(rawSlug),
     ownerName: formData.get('ownerName'),
     ownerEmail: formData.get('ownerEmail'),
+    ownerPassword: formData.get('ownerPassword'),
     ownerPhone: (formData.get('ownerPhone') as string) || undefined,
     currency: formData.get('currency') || 'INR',
     timezone: formData.get('timezone') || 'Asia/Kolkata',
@@ -84,22 +86,26 @@ export async function createRestaurant(_prev: CreateRestaurantState, formData: F
     return { error: 'Could not create the restaurant. Please try again.' };
   }
 
-  // Inviting the owner's auth account needs the Admin Auth API — the one
-  // legitimate use of the service-role client in this app (see lib/supabase/admin.ts).
+  // Creating the owner's auth account with a Super-Admin-supplied password needs
+  // the Admin Auth API — the one legitimate use of the service-role client in
+  // this app (see lib/supabase/admin.ts).
   const admin = createAdminClient();
-  const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(input.ownerEmail, {
-    data: { name: input.ownerName },
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: input.ownerEmail,
+    password: input.ownerPassword,
+    email_confirm: true,
+    user_metadata: { name: input.ownerName },
   });
 
-  if (inviteError || !invite?.user) {
-    console.error('createRestaurant: owner invite failed', inviteError);
+  if (createError || !created?.user) {
+    console.error('createRestaurant: owner account creation failed', createError);
     revalidatePath('/super-admin');
     redirect(`/super-admin/restaurants/${restaurant.id}?ownerInviteError=1`);
   }
 
   const { error: memberError } = await supabase.from('restaurant_members').insert({
     restaurant_id: restaurant.id,
-    user_id: invite.user.id,
+    user_id: created.user.id,
     role: 'owner',
     display_name: input.ownerName,
     phone: input.ownerPhone || null,
