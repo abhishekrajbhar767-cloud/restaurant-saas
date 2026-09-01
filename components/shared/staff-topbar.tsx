@@ -1,12 +1,15 @@
 import { signOut } from '@/app/auth/login/actions';
+import { PublicPageActions } from '@/components/shared/public-page-actions';
 
 export function StaffTopbar({
   area,
   restaurantName,
+  restaurantSlug,
   supportMode = false,
 }: {
   area: string;
   restaurantName?: string;
+  restaurantSlug?: string;
   supportMode?: boolean;
 }) {
   return (
@@ -16,17 +19,20 @@ export function StaffTopbar({
           SUPER ADMIN SUPPORT MODE — actions here are logged
         </div>
       )}
-      <header className="border-b border-line bg-ink-900 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
+      <header className="border-b border-line bg-ink-900 px-6 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3 min-w-0">
           <span className="font-display font-bold text-sm">Smart Restaurant OS</span>
           <span className="text-text-muted text-xs uppercase tracking-wide">{area}</span>
-          {restaurantName && <span className="text-xs text-amber font-mono">{restaurantName}</span>}
+          {restaurantName && <span className="text-xs text-amber font-mono truncate">{restaurantName}</span>}
         </div>
-        <form action={signOut}>
-          <button type="submit" className="text-xs text-text-muted hover:text-text underline underline-offset-2">
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-4 shrink-0">
+          {restaurantSlug && <PublicPageActions restaurantSlug={restaurantSlug} />}
+          <form action={signOut}>
+            <button type="submit" className="text-xs text-text-muted hover:text-text underline underline-offset-2">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
     </>
   );
