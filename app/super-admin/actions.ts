@@ -100,7 +100,7 @@ export async function createRestaurant(_prev: CreateRestaurantState, formData: F
   if (createError || !created?.user) {
     console.error('createRestaurant: owner account creation failed', createError);
     revalidatePath('/super-admin');
-    redirect(`/super-admin/restaurants/${restaurant.id}?ownerInviteError=1`);
+    redirect(`/super-admin/restaurants/${restaurant.id}?ownerError=1`);
   }
 
   const { error: memberError } = await supabase.from('restaurant_members').insert({
@@ -114,7 +114,7 @@ export async function createRestaurant(_prev: CreateRestaurantState, formData: F
   if (memberError) {
     console.error('createRestaurant: owner membership insert failed', memberError);
     revalidatePath('/super-admin');
-    redirect(`/super-admin/restaurants/${restaurant.id}?ownerInviteError=1`);
+    redirect(`/super-admin/restaurants/${restaurant.id}?ownerError=1`);
   }
 
   if (input.seedDefaultCategories) {
@@ -142,38 +142,55 @@ export async function setRestaurantStatus(restaurantId: string, status: Restaura
   revalidatePath(`/super-admin/restaurants/${restaurantId}`);
 }
 
-export async function retryOwnerInvite(_prev: CreateRestaurantState, formData: FormData): Promise<CreateRestaurantState> {
+const RetryOwnerSchema = z.object({
+  restaurantId: z.string().uuid(),
+  ownerName: z.string().min(2, "Owner's name is required"),
+  ownerEmail: z.string().email('Enter a valid email address'),
+  ownerPassword: z.string().min(6, 'Owner password must be at least 6 characters'),
+  ownerPhone: z.string().optional(),
+});
+
+/** Used when the very first owner account creation failed at restaurant-creation time. */
+export async function retryOwnerCreation(_prev: CreateRestaurantState, formData: FormData): Promise<CreateRestaurantState> {
   await requireRole(['super_admin']);
 
-  const restaurantId = formData.get('restaurantId') as string;
-  const ownerName = formData.get('ownerName') as string;
-  const ownerEmail = formData.get('ownerEmail') as string;
-  const ownerPhone = (formData.get('ownerPhone') as string) || undefined;
-
-  if (!restaurantId || !ownerName || !ownerEmail) {
-    return { error: 'Missing required fields.' };
+  const parsed = RetryOwnerSchema.safeParse({
+    restaurantId: formData.get('restaurantId'),
+    ownerName: formData.get('ownerName'),
+    ownerEmail: formData.get('ownerEmail'),
+    ownerPassword: formData.get('ownerPassword'),
+    ownerPhone: (formData.get('ownerPhone') as string) || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
+  const { restaurantId, ownerName, ownerEmail, ownerPassword, ownerPhone } = parsed.data;
+
   const admin = createAdminClient();
-  const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(ownerEmail, {
-    data: { name: ownerName },
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: ownerEmail,
+    password: ownerPassword,
+    user_metadata: { name: ownerName },
+    email_confirm: true,
   });
 
-  if (inviteError || !invite?.user) {
-    return { error: 'Could not send the invite — that email may already be registered.' };
+  if (createError || !created?.user) {
+    console.error('retryOwnerCreation: owner account creation failed', createError);
+    return { error: 'Could not create that account — the email may already be registered.' };
   }
 
   const supabase = createClient();
   const { error: memberError } = await supabase.from('restaurant_members').insert({
     restaurant_id: restaurantId,
-    user_id: invite.user.id,
+    user_id: created.user.id,
     role: 'owner',
     display_name: ownerName,
     phone: ownerPhone || null,
   });
 
   if (memberError) {
-    return { error: 'Invite sent, but could not attach the owner role. Contact support.' };
+    return { error: 'Account created, but could not attach the owner role. Contact support.' };
   }
 
   revalidatePath(`/super-admin/restaurants/${restaurantId}`);
@@ -184,6 +201,7 @@ const ReplaceOwnerSchema = z.object({
   restaurantId: z.string().uuid(),
   ownerName: z.string().min(2, "Owner's name is required"),
   ownerEmail: z.string().email('Enter a valid email address'),
+  ownerPassword: z.string().min(6, 'Owner password must be at least 6 characters'),
   ownerPhone: z.string().optional(),
 });
 
@@ -198,6 +216,7 @@ export async function replaceOwner(_prev: ReplaceOwnerState, formData: FormData)
     restaurantId: formData.get('restaurantId'),
     ownerName: formData.get('ownerName'),
     ownerEmail: formData.get('ownerEmail'),
+    ownerPassword: formData.get('ownerPassword'),
     ownerPhone: (formData.get('ownerPhone') as string) || undefined,
   });
 
@@ -205,15 +224,19 @@ export async function replaceOwner(_prev: ReplaceOwnerState, formData: FormData)
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { restaurantId, ownerName, ownerEmail, ownerPhone } = parsed.data;
+  const { restaurantId, ownerName, ownerEmail, ownerPassword, ownerPhone } = parsed.data;
 
   const admin = createAdminClient();
-  const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(ownerEmail, {
-    data: { name: ownerName },
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: ownerEmail,
+    password: ownerPassword,
+    user_metadata: { name: ownerName },
+    email_confirm: true,
   });
 
-  if (inviteError || !invite?.user) {
-    return { error: 'Could not invite that email — it may already be registered.' };
+  if (createError || !created?.user) {
+    console.error('replaceOwner: owner account creation failed', createError);
+    return { error: 'Could not create that account — the email may already be registered.' };
   }
 
   const supabase = createClient();
@@ -233,7 +256,7 @@ export async function replaceOwner(_prev: ReplaceOwnerState, formData: FormData)
 
   const { error: memberError } = await supabase.from('restaurant_members').insert({
     restaurant_id: restaurantId,
-    user_id: invite.user.id,
+    user_id: created.user.id,
     role: 'owner',
     display_name: ownerName,
     phone: ownerPhone || null,
@@ -241,7 +264,7 @@ export async function replaceOwner(_prev: ReplaceOwnerState, formData: FormData)
 
   if (memberError) {
     console.error('replaceOwner: new owner membership failed', memberError);
-    return { error: 'Invite sent, but could not attach the owner role. Contact support.' };
+    return { error: 'Account created, but could not attach the owner role. Contact support.' };
   }
 
   revalidatePath(`/super-admin/restaurants/${restaurantId}`);

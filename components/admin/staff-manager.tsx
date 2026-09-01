@@ -54,7 +54,7 @@ function AddStaffForm({ canAddManagers, onError }: { canAddManagers: boolean; on
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="card p-4 grid sm:grid-cols-4 gap-3 items-end">
+    <form ref={formRef} onSubmit={handleSubmit} className="card p-4 grid sm:grid-cols-5 gap-3 items-end">
       <div className="sm:col-span-1">
         <label htmlFor="staff-name" className="field-label">
           Name
@@ -74,6 +74,21 @@ function AddStaffForm({ canAddManagers, onError }: { canAddManagers: boolean; on
         <input id="staff-phone" name="phone" type="tel" className="field-input" />
       </div>
       <div className="sm:col-span-1">
+        <label htmlFor="staff-password" className="field-label">
+          Password
+        </label>
+        <input
+          id="staff-password"
+          name="password"
+          type="text"
+          required
+          minLength={6}
+          autoComplete="new-password"
+          className="field-input font-mono"
+          placeholder="min 6 characters"
+        />
+      </div>
+      <div className="sm:col-span-1">
         <label htmlFor="staff-role" className="field-label">
           Role
         </label>
@@ -83,8 +98,8 @@ function AddStaffForm({ canAddManagers, onError }: { canAddManagers: boolean; on
           <option value="waiter">Waiter</option>
         </select>
       </div>
-      <button type="submit" disabled={isPending} className="btn-primary sm:col-span-4 w-fit">
-        {isPending ? 'Sending invite…' : '+ Invite staff member'}
+      <button type="submit" disabled={isPending} className="btn-primary sm:col-span-5 w-fit">
+        {isPending ? 'Creating account…' : '+ Create staff member'}
       </button>
     </form>
   );

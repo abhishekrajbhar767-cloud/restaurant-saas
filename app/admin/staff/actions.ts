@@ -17,6 +17,7 @@ async function requireTenant() {
 const AddStaffSchema = z.object({
   name: z.string().min(2, "Staff member's name is required"),
   email: z.string().email('Enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   phone: z.string().optional(),
   role: z.enum(['manager', 'kitchen', 'waiter']),
 });
@@ -27,6 +28,7 @@ export async function addStaff(formData: FormData) {
   const parsed = AddStaffSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),
+    password: formData.get('password'),
     phone: formData.get('phone') || undefined,
     role: formData.get('role'),
   });
@@ -40,23 +42,28 @@ export async function addStaff(formData: FormData) {
     throw new Error('Only the owner can add another manager.');
   }
 
+  // Creating the staff account with a password needs the Admin Auth API —
+  // the account is created instantly active, no email invite/verification.
   const admin = createAdminClient();
-  const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
-    data: { name: parsed.data.name },
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    user_metadata: { name: parsed.data.name },
+    email_confirm: true,
   });
-  if (inviteError || !invite?.user) {
-    throw new Error('Could not invite that email — it may already be registered.');
+  if (createError || !created?.user) {
+    throw new Error('Could not create that account — the email may already be registered.');
   }
 
   const supabase = createClient();
   const { error: memberError } = await supabase.from('restaurant_members').insert({
     restaurant_id: restaurantId,
-    user_id: invite.user.id,
+    user_id: created.user.id,
     role: parsed.data.role as MemberRole,
     display_name: parsed.data.name,
     phone: parsed.data.phone || null,
   });
-  if (memberError) throw new Error('Invite sent, but could not assign the role. Contact support.');
+  if (memberError) throw new Error('Account created, but could not assign the role. Contact support.');
 
   revalidatePath('/admin/staff');
 }

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { StatCard } from '@/components/shared/stat-card';
 import { RestaurantStatusBadge } from '@/components/shared/status-badge';
 import { RestaurantStatusActions } from '@/components/super-admin/restaurant-status-actions';
-import { ManageOwnerSection, RetryInviteForm } from './owner-form';
+import { ManageOwnerSection, RetryOwnerForm } from './owner-form';
 import { getRestaurantById, getRestaurantStats, getRestaurantStaff, getRestaurantTables, getRecentOrders } from '@/lib/super-admin/queries';
 import { ROLE_LABEL } from '@/lib/auth/roles';
 
@@ -12,7 +12,7 @@ export default async function RestaurantDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { ownerInviteError?: string };
+  searchParams: { ownerError?: string };
 }) {
   const restaurant = await getRestaurantById(params.id);
   if (!restaurant) notFound();
@@ -45,13 +45,14 @@ export default async function RestaurantDetailPage({
         <RestaurantStatusActions restaurantId={restaurant.id} status={restaurant.status} />
       </div>
 
-      {searchParams.ownerInviteError && (
+      {searchParams.ownerError && (
         <div className="card border-danger/40 p-5">
-          <h2 className="font-display font-bold text-danger mb-1">Owner invite failed</h2>
+          <h2 className="font-display font-bold text-danger mb-1">Owner account creation failed</h2>
           <p className="text-sm text-text-muted mb-4">
-            The restaurant was created, but the owner invite email didn&apos;t go through. Try again below.
+            The restaurant was created, but the owner account couldn&apos;t be created — the email may already be registered.
+            Enter a password and try again below.
           </p>
-          <RetryInviteForm restaurantId={restaurant.id} />
+          <RetryOwnerForm restaurantId={restaurant.id} />
         </div>
       )}
 

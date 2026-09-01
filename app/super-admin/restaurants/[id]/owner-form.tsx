@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { replaceOwner, retryOwnerInvite, type ReplaceOwnerState, type CreateRestaurantState } from '@/app/super-admin/actions';
+import { replaceOwner, retryOwnerCreation, type ReplaceOwnerState, type CreateRestaurantState } from '@/app/super-admin/actions';
 
 export function ManageOwnerSection({
   restaurantId,
@@ -50,16 +50,16 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
   );
 }
 
-/** Used when the very first owner invite failed at restaurant-creation time. */
-export function RetryInviteForm({ restaurantId }: { restaurantId: string }) {
-  const [state, formAction] = useFormState<CreateRestaurantState, FormData>(retryOwnerInvite, {});
+/** Used when the very first owner account creation failed at restaurant-creation time. */
+export function RetryOwnerForm({ restaurantId }: { restaurantId: string }) {
+  const [state, formAction] = useFormState<CreateRestaurantState, FormData>(retryOwnerCreation, {});
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="restaurantId" value={restaurantId} />
       <OwnerFields />
       {state.error && <ErrorText message={state.error} />}
-      <SubmitButton label="Send invite" pendingLabel="Sending…" />
+      <SubmitButton label="Create owner account" pendingLabel="Creating…" />
     </form>
   );
 }
@@ -73,7 +73,7 @@ export function ReplaceOwnerForm({ restaurantId }: { restaurantId: string }) {
       <input type="hidden" name="restaurantId" value={restaurantId} />
       <OwnerFields />
       {state.error && <ErrorText message={state.error} />}
-      <SubmitButton label="Replace owner" pendingLabel="Sending…" />
+      <SubmitButton label="Replace owner" pendingLabel="Creating…" />
     </form>
   );
 }
@@ -93,7 +93,22 @@ function OwnerFields() {
         </label>
         <input id="ownerEmail" name="ownerEmail" type="email" required className="field-input" />
       </div>
-      <div className="sm:col-span-2">
+      <div>
+        <label htmlFor="ownerPassword" className="field-label">
+          Password
+        </label>
+        <input
+          id="ownerPassword"
+          name="ownerPassword"
+          type="text"
+          required
+          minLength={6}
+          autoComplete="new-password"
+          className="field-input font-mono"
+          placeholder="min 6 characters"
+        />
+      </div>
+      <div>
         <label htmlFor="ownerPhone" className="field-label">
           Phone (optional)
         </label>
