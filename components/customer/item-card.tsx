@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import type { MenuItem } from '@/types/database';
 
 // Color is never the only signal here — shape + a screen-reader label carry
@@ -52,7 +51,8 @@ export function ItemCard({
 
       <div className="flex flex-col items-center gap-2 shrink-0 w-24">
         {item.image_url ? (
-          <Image src={item.image_url} alt={item.name} width={96} height={96} className="h-24 w-24 rounded object-cover" />
+          // eslint-disable-next-line @next/next/no-img-element -- image URL may be any host; next/image would crash on unconfigured hostnames
+          <img src={item.image_url} alt={item.name} width={96} height={96} loading="lazy" className="h-24 w-24 rounded object-cover" />
         ) : (
           <div className="h-24 w-24 rounded bg-ink-950/5" aria-hidden />
         )}

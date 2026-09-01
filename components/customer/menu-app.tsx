@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import { ItemCard } from '@/components/customer/item-card';
 import { CartSheet } from '@/components/customer/cart-sheet';
 import { QuickActions } from '@/components/customer/quick-actions';
@@ -78,7 +77,8 @@ export function MenuApp({
     <div className="pb-28">
       <header className="px-5 pt-6 pb-4 flex items-center gap-3">
         {restaurant.logo_url ? (
-          <Image src={restaurant.logo_url} alt={restaurant.name} width={48} height={48} className="rounded-full object-cover" />
+          // eslint-disable-next-line @next/next/no-img-element -- owner-supplied URL can be any host; next/image would crash on unconfigured hostnames
+          <img src={restaurant.logo_url} alt={restaurant.name} width={48} height={48} className="rounded-full object-cover" />
         ) : (
           <div className="h-12 w-12 rounded-full bg-ink-950/10 flex items-center justify-center font-display font-bold text-lg">
             {restaurant.name.charAt(0)}
