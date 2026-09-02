@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
-import { startRingLoop, stopRingLoop, unlockAlertSound } from '@/lib/waiter/alert-sound';
-import { startVibrationLoop, stopVibrationLoop } from '@/lib/waiter/alert-vibrate';
+import { RINGTONE_SRC } from '@/lib/waiter/ringtone';
 import { releaseWakeLock, requestWakeLock } from '@/lib/waiter/wake-lock';
 import type { ServiceRequestWithTable, ServiceRequest, WaiterStatusRow, WaiterAvailability } from '@/types/database';
+
+// 1s buzz, 0.5s rest, twice — refired every 3s by the interval below.
+const VIBRATE_PATTERN: number[] = [1000, 500, 1000, 500];
 
 export function WaiterApp({
   restaurantId,
@@ -24,58 +26,40 @@ export function WaiterApp({
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
 
-  // Mobile browsers keep the AudioContext suspended until a real user
-  // gesture, so unlock on the page's first interaction of any kind — tapping
-  // the FREE/BUSY button, accepting a request, anything.
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const vibrateTimerRef = useRef<number | null>(null);
+  const shouldRingRef = useRef(false);
+
+  function stopVibrationNow() {
+    if (vibrateTimerRef.current !== null) {
+      clearInterval(vibrateTimerRef.current);
+      vibrateTimerRef.current = null;
+    }
+    navigator.vibrate?.(0);
+  }
+
+  // Mobile autoplay policy: an <audio> element can only be played after a
+  // real user gesture. On the page's first interaction, "prime" the element
+  // by playing and immediately pausing again (when nothing is waiting), so
+  // later programmatic play() calls from the realtime path are allowed.
   useEffect(() => {
-    const unlock = () => unlockAlertSound();
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('touchend', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('touchend', unlock);
-      window.removeEventListener('keydown', unlock);
+    const prime = () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio
+        .play()
+        .then(() => {
+          if (!shouldRingRef.current) audio.pause();
+        })
+        .catch(() => {});
     };
-  }, []);
-
-  const pendingCount = requests.filter((r) => r.status === 'pending').length;
-
-  // Phone-call ring: loops while there are waiting requests AND the waiter
-  // is FREE. Stops when the queue empties, Accept is clicked (availability
-  // flips to busy below), or the waiter toggles BUSY.
-  useEffect(() => {
-    if (pendingCount > 0 && availability === 'free') startRingLoop();
-    else stopRingLoop();
-  }, [pendingCount, availability]);
-
-  // Vibration runs independently of audio (works with the phone on silent)
-  // and keeps going while ANY request is still waiting.
-  useEffect(() => {
-    if (pendingCount > 0) startVibrationLoop();
-    else stopVibrationLoop();
-  }, [pendingCount]);
-
-  // Keep the screen on so mobile browsers don't throttle the loops to death.
-  // The browser releases the lock whenever the tab is hidden, so re-request
-  // it when the waiter comes back to the tab.
-  useEffect(() => {
-    void requestWakeLock();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void requestWakeLock();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pointerdown', prime, { once: true });
+    window.addEventListener('touchend', prime, { once: true });
+    window.addEventListener('keydown', prime, { once: true });
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      void releaseWakeLock();
-    };
-  }, []);
-
-  // Unmount safety net: stop every loop no matter which state we leave in.
-  useEffect(() => {
-    return () => {
-      stopRingLoop();
-      stopVibrationLoop();
+      window.removeEventListener('pointerdown', prime);
+      window.removeEventListener('touchend', prime);
+      window.removeEventListener('keydown', prime);
     };
   }, []);
 
@@ -91,7 +75,6 @@ export function WaiterApp({
           const req = payload.new as ServiceRequest;
           const { data: table } = await supabase.from('tables').select('table_number').eq('id', req.table_id).maybeSingle().returns<{ table_number: string }>();
           setRequests((prev) => [...prev, { ...req, table_number: table?.table_number ?? '—' }]);
-          if (req.status === 'pending') playRequestAlert();
         }
       )
       .on(
@@ -126,14 +109,80 @@ export function WaiterApp({
     return () => clearTimeout(id);
   }, [toast]);
 
+  const pendingCount = requests.filter((r) => r.status === 'pending').length;
+
+  // Phone-call ring: the native loop attribute keeps the sound ringing; this
+  // effect only decides when it sounds. Stop = pause + rewind to 0.
+  useEffect(() => {
+    const audio = audioRef.current;
+    shouldRingRef.current = pendingCount > 0 && availability === 'free';
+    if (!audio) return;
+    if (shouldRingRef.current) {
+      void audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }, [pendingCount, availability]);
+
+  // Vibration is fully independent of audio (a phone on silent still buzzes)
+  // and keeps going while ANY request is still waiting.
+  useEffect(() => {
+    if (pendingCount > 0) {
+      if (vibrateTimerRef.current === null) {
+        navigator.vibrate?.(VIBRATE_PATTERN);
+        vibrateTimerRef.current = window.setInterval(() => navigator.vibrate?.(VIBRATE_PATTERN), 3000);
+      }
+    } else {
+      stopVibrationNow();
+    }
+    return () => stopVibrationNow();
+  }, [pendingCount]);
+
+  // Keep the screen on so mobile browsers don't throttle the loops to death.
+  // The browser releases the lock whenever the tab is hidden, so re-request
+  // it when the waiter comes back to the tab.
+  useEffect(() => {
+    void requestWakeLock();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void requestWakeLock();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      void releaseWakeLock();
+    };
+  }, []);
+
+  // Unmount safety net: silence audio and stop vibration on the way out.
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+      stopVibrationNow();
+    };
+  }, []);
+
   async function handleToggleAvailability() {
-    unlockAlertSound(); // this tap is a user gesture — safe place to unlock audio
     setTogglePending(true);
     const next: WaiterAvailability = availability === 'free' ? 'busy' : 'free';
     const supabase = createClient();
     const { error } = await supabase.rpc('set_waiter_availability', { p_restaurant_id: restaurantId, p_availability: next });
     setTogglePending(false);
-    if (!error) setAvailability(next);
+    if (!error) {
+      setAvailability(next);
+      if (next === 'busy') {
+        // Switching to BUSY must silence the ring instantly, not next render.
+        const audio = audioRef.current;
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      }
+    }
   }
 
   async function handleAccept(requestId: string) {
@@ -148,6 +197,13 @@ export function WaiterApp({
       return;
     }
     setAvailability('busy');
+    // Accepting a request must stop the call-style alerts immediately.
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    if (!requests.some((r) => r.status === 'pending' && r.id !== requestId)) stopVibrationNow();
     setToast('You got it — head to the table');
   }
 
@@ -167,6 +223,8 @@ export function WaiterApp({
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
+      <audio ref={audioRef} src={RINGTONE_SRC} loop preload="auto" />
+
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-ink-800 text-text text-sm px-4 py-2 rounded-full shadow-lg border border-line" role="status">
           {toast}
