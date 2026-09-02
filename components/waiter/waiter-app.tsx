@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
+import { playRequestAlert, unlockAlertSound } from '@/lib/waiter/alert-sound';
 import type { ServiceRequestWithTable, ServiceRequest, WaiterStatusRow, WaiterAvailability } from '@/types/database';
 
 export function WaiterApp({
@@ -21,6 +22,21 @@ export function WaiterApp({
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
 
+  // Mobile browsers keep the AudioContext suspended until a real user
+  // gesture, so unlock on the page's first interaction of any kind — tapping
+  // the FREE/BUSY button, accepting a request, anything.
+  useEffect(() => {
+    const unlock = () => unlockAlertSound();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('touchend', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('touchend', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
   useEffect(() => {
     const supabase = createClient();
 
@@ -33,6 +49,7 @@ export function WaiterApp({
           const req = payload.new as ServiceRequest;
           const { data: table } = await supabase.from('tables').select('table_number').eq('id', req.table_id).maybeSingle().returns<{ table_number: string }>();
           setRequests((prev) => [...prev, { ...req, table_number: table?.table_number ?? '—' }]);
+          if (req.status === 'pending') playRequestAlert();
         }
       )
       .on(
@@ -68,6 +85,7 @@ export function WaiterApp({
   }, [toast]);
 
   async function handleToggleAvailability() {
+    unlockAlertSound(); // this tap is a user gesture — safe place to unlock audio
     setTogglePending(true);
     const next: WaiterAvailability = availability === 'free' ? 'busy' : 'free';
     const supabase = createClient();
