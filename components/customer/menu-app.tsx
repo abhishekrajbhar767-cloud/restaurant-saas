@@ -148,7 +148,7 @@ export function MenuApp({
         )}
       </main>
 
-      <QuickActions tableQrToken={table.qr_token} />
+      <QuickActions tableId={table.id} tableQrToken={table.qr_token} />
 
       {cart.length > 0 && (
         <button

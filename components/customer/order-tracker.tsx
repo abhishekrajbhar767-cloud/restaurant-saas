@@ -132,7 +132,7 @@ export function OrderTracker({
       </div>
       </div>
 
-      {tableQrToken && <QuickActions tableQrToken={tableQrToken} />}
+      {tableQrToken && <QuickActions tableId={tableId} tableQrToken={tableQrToken} />}
     </div>
   );
 }
