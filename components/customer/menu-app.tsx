@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ItemCard } from '@/components/customer/item-card';
 import { CartSheet } from '@/components/customer/cart-sheet';
 import { QuickActions } from '@/components/customer/quick-actions';
+import { ActiveOrders } from '@/components/customer/active-orders';
 import { ServiceStatusBanner } from '@/components/customer/service-status-banner';
 import { loadCart, saveCart, cartTotal, cartCount, type CartLine } from '@/lib/customer/cart';
 import type { Restaurant, RestaurantTable, MenuCategory, MenuItem } from '@/types/database';
@@ -89,6 +90,13 @@ export function MenuApp({
           <p className="text-xs text-text-onPaper/50">Table {table.table_number}</p>
         </div>
       </header>
+
+      <ActiveOrders
+        tableId={table.id}
+        restaurantSlug={restaurant.slug}
+        tableQrToken={table.qr_token}
+        currency={restaurant.currency}
+      />
 
       <div className="sticky top-0 bg-paper z-30 pt-1">
         <ServiceStatusBanner tableId={table.id} />

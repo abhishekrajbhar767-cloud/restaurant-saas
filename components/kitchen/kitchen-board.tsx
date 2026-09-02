@@ -19,6 +19,10 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
   const audioRef = useRef<HTMLAudioElement>(null);
   const vibrateTimerRef = useRef<number | null>(null);
   const shouldRingRef = useRef(false);
+  // Orders with a transition RPC in flight — blocks the double-tap that used
+  // to hit the state machine twice and throw "Invalid transition from ready
+  // to ready".
+  const transitioningRef = useRef<Set<string>>(new Set());
 
   function stopVibrationNow() {
     if (vibrateTimerRef.current !== null) {
@@ -163,7 +167,12 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
   }
 
   async function handleAccept(orderId: string, minutes: number) {
+    const current = orders.find((o) => o.id === orderId);
+    if (!current || current.status !== 'placed' || transitioningRef.current.has(orderId)) return; // already accepted / in flight
+    transitioningRef.current.add(orderId);
+
     const { error } = await acceptOrder(orderId, minutes);
+    transitioningRef.current.delete(orderId);
     if (error) {
       setError(error);
       return;
@@ -182,21 +191,46 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
   }
 
   async function handleReady(orderId: string) {
+    const current = orders.find((o) => o.id === orderId);
+    if (!current || (current.status !== 'accepted' && current.status !== 'preparing') || transitioningRef.current.has(orderId)) return;
+    transitioningRef.current.add(orderId);
+
     const { error } = await markReady(orderId);
-    if (error) setError(error);
+    transitioningRef.current.delete(orderId);
+    if (error) {
+      setError(error);
+      return;
+    }
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'ready' as const } : o)));
   }
 
   async function handleServed(orderId: string) {
+    const current = orders.find((o) => o.id === orderId);
+    if (!current || current.status !== 'ready' || transitioningRef.current.has(orderId)) return;
+    transitioningRef.current.add(orderId);
+
     const { error } = await markServed(orderId);
-    if (error) setError(error);
-    else setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    transitioningRef.current.delete(orderId);
+    if (error) {
+      setError(error);
+      return;
+    }
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
   }
 
   async function handleCancel(orderId: string) {
+    const current = orders.find((o) => o.id === orderId);
+    if (!current || !['placed', 'accepted', 'preparing'].includes(current.status) || transitioningRef.current.has(orderId)) return;
+    transitioningRef.current.add(orderId);
+
     const reason = window.prompt('Reason for cancelling this order (optional):') ?? '';
     const { error } = await cancelOrder(orderId, reason);
-    if (error) setError(error);
-    else setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    transitioningRef.current.delete(orderId);
+    if (error) {
+      setError(error);
+      return;
+    }
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
   }
 
   return (
