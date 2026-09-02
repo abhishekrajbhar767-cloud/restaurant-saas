@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
-import { playRequestAlert, unlockAlertSound } from '@/lib/waiter/alert-sound';
+import { startRingLoop, stopRingLoop, unlockAlertSound } from '@/lib/waiter/alert-sound';
+import { startVibrationLoop, stopVibrationLoop } from '@/lib/waiter/alert-vibrate';
+import { releaseWakeLock, requestWakeLock } from '@/lib/waiter/wake-lock';
 import type { ServiceRequestWithTable, ServiceRequest, WaiterStatusRow, WaiterAvailability } from '@/types/database';
 
 export function WaiterApp({
@@ -34,6 +36,46 @@ export function WaiterApp({
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('touchend', unlock);
       window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  const pendingCount = requests.filter((r) => r.status === 'pending').length;
+
+  // Phone-call ring: loops while there are waiting requests AND the waiter
+  // is FREE. Stops when the queue empties, Accept is clicked (availability
+  // flips to busy below), or the waiter toggles BUSY.
+  useEffect(() => {
+    if (pendingCount > 0 && availability === 'free') startRingLoop();
+    else stopRingLoop();
+  }, [pendingCount, availability]);
+
+  // Vibration runs independently of audio (works with the phone on silent)
+  // and keeps going while ANY request is still waiting.
+  useEffect(() => {
+    if (pendingCount > 0) startVibrationLoop();
+    else stopVibrationLoop();
+  }, [pendingCount]);
+
+  // Keep the screen on so mobile browsers don't throttle the loops to death.
+  // The browser releases the lock whenever the tab is hidden, so re-request
+  // it when the waiter comes back to the tab.
+  useEffect(() => {
+    void requestWakeLock();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void requestWakeLock();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      void releaseWakeLock();
+    };
+  }, []);
+
+  // Unmount safety net: stop every loop no matter which state we leave in.
+  useEffect(() => {
+    return () => {
+      stopRingLoop();
+      stopVibrationLoop();
     };
   }, []);
 

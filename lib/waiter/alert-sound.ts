@@ -1,13 +1,12 @@
 // lib/waiter/alert-sound.ts
-// Loud synthesized "double bell" for new service requests on the waiter app.
-// Web Audio API is synthesized at runtime — no audio asset to load, works
-// offline, and never 404s.
+// Continuous "incoming call" style ring for the waiter app, synthesized with
+// the Web Audio API — no audio asset to load, works offline, never 404s.
 //
 // Mobile autoplay policy: browsers create the AudioContext in a "suspended"
 // state until a real user gesture happens. unlockAlertSound() must be called
-// from inside a user event handler (we wire it to any first tap/key press and
-// to the FREE/BUSY button). Until unlocked, playRequestAlert() stays silent
-// rather than throwing.
+// from inside a user event handler (wired to any first tap/key press and to
+// the FREE/BUSY button). Until then the ring loop keeps ticking silently and
+// starts ringing as soon as the context is unlocked.
 
 let ctx: AudioContext | null = null;
 
@@ -70,16 +69,41 @@ function bell(c: AudioContext, freq: number, at: number, duration: number, peak:
   harmonic.stop(at + duration * 0.6);
 }
 
-/**
- * Two rising bell rings (E6 then a higher A6) — loud and clearly distinct
- * from message/notification sounds a phone might already be making.
- */
-export function playRequestAlert(): boolean {
-  const c = getContext();
-  if (!c || c.state !== 'running') return false; // not gesture-unlocked yet
-
+// One ring cycle: two quick bell hits ("brr-brr"), like a phone ringer.
+function ringBurst(c: AudioContext) {
   const now = c.currentTime + 0.02;
-  bell(c, 1318.5, now, 0.35, 0.8); // first ring
-  bell(c, 1760.0, now + 0.22, 0.5, 0.85); // higher second ring
-  return true;
+  bell(c, 1567.98, now, 0.4, 0.85);
+  bell(c, 1567.98, now + 0.45, 0.4, 0.85);
+}
+
+const RING_PERIOD_MS = 2400;
+
+let ringActive = false;
+let ringTimer: number | null = null;
+
+/**
+ * Ring continuously until stopRingLoop() is called. Each cycle re-checks the
+ * AudioContext state, so if the context is still gesture-locked the loop
+ * ticks silently and starts sounding the moment it unlocks.
+ */
+export function startRingLoop() {
+  if (ringActive) return;
+  ringActive = true;
+
+  const cycle = () => {
+    if (!ringActive) return;
+    const c = getContext();
+    if (c && c.state === 'running') ringBurst(c);
+    ringTimer = window.setTimeout(cycle, RING_PERIOD_MS);
+  };
+  cycle();
+}
+
+/** Stops the loop immediately; any burst already scheduled plays out (<0.9s). */
+export function stopRingLoop() {
+  ringActive = false;
+  if (ringTimer !== null) {
+    clearTimeout(ringTimer);
+    ringTimer = null;
+  }
 }
