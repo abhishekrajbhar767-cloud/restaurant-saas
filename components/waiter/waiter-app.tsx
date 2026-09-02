@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
-import { RINGTONE_SRC } from '@/lib/waiter/ringtone';
-import { releaseWakeLock, requestWakeLock } from '@/lib/waiter/wake-lock';
+import { RINGTONE_SRC } from '@/lib/shared/ringtone';
+import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
 import type { ServiceRequestWithTable, ServiceRequest, WaiterStatusRow, WaiterAvailability } from '@/types/database';
 
 // 1s buzz, 0.5s rest, twice — refired every 3s by the interval below.

@@ -1,4 +1,4 @@
-// lib/waiter/wake-lock.ts
+// lib/shared/wake-lock.ts
 // Screen Wake Lock keeps the waiter's phone screen on, because mobile
 // browsers throttle timers and suspend Web Audio when the screen turns off —
 // which would silently kill the ring/vibration loops.

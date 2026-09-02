@@ -1,4 +1,4 @@
-// lib/waiter/ringtone.ts
+// lib/shared/ringtone.ts
 // Loud telephone-style ring (dual 440+480 Hz tone with a 20 Hz bell
 // tremolo), 2 s seamless loop embedded as a base64 WAV — plays offline and
 // can never 404. Generated once by script; do not edit by hand.
