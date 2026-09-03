@@ -6,6 +6,8 @@ import { AdminNav } from '@/components/admin/admin-nav';
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireRole(['owner', 'manager']);
   const restaurant = ctx.tenantMembership?.restaurant;
+  const role = ctx.tenantMembership?.role;
+  const canManage = ctx.isSuperAdmin || role === 'owner' || role === 'manager';
 
   if (!restaurant) {
     // Reached by a Super Admin with no tenant membership of their own — real
@@ -25,7 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen">
       <StaffTopbar area="Admin" restaurantName={restaurant.name} restaurantSlug={restaurant.slug} />
       {restaurant.status === 'suspended' && <SuspendedBanner />}
-      <AdminNav />
+      <AdminNav canManage={canManage} />
       <main className="p-6 max-w-6xl mx-auto">{children}</main>
     </div>
   );

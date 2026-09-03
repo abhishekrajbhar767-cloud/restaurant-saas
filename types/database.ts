@@ -15,6 +15,7 @@ export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'serve
 export type ServiceRequestType = 'waiter' | 'water' | 'bill';
 export type ServiceRequestStatus = 'pending' | 'claimed' | 'resolved' | 'cancelled';
 export type WaiterAvailability = 'free' | 'busy' | 'offline';
+export type TableStatus = 'empty' | 'dining' | 'billed';
 
 export type Restaurant = {
   id: string;
@@ -46,6 +47,7 @@ export type RestaurantTable = {
   table_number: string;
   qr_token: string;
   is_active: boolean;
+  status: TableStatus;
   created_at: string;
 };
 
@@ -223,6 +225,7 @@ export type Database = {
       service_request_type: ServiceRequestType;
       service_request_status: ServiceRequestStatus;
       waiter_availability: WaiterAvailability;
+      table_status: TableStatus;
     };
     CompositeTypes: {
       [_ in never]: never;
