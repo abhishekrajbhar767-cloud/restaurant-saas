@@ -5,7 +5,13 @@
 // server component without duplicating the role logic here.
 
 import { createClient } from '@/lib/supabase/server';
-import type { EodSummary, StaffShiftHistoryRow, TopSellingItem } from '@/types/database';
+import type {
+  EodSummary,
+  StaffRequestTiming,
+  StaffShiftHistoryRow,
+  TableTurnaround,
+  TopSellingItem,
+} from '@/types/database';
 
 const EMPTY_SUMMARY: EodSummary = {
   order_count: 0,
@@ -66,6 +72,43 @@ export async function getStaffShiftHistory(
   if (error) {
     console.error('get_staff_shift_history failed', error);
     throw new Error('Could not load staff shift history.');
+  }
+  return data ?? [];
+}
+
+const EMPTY_TURNAROUND: TableTurnaround = {
+  completed_sessions: 0,
+  average_minutes: null,
+  longest_minutes: 0,
+  open_sessions: 0,
+};
+
+export async function getTableTurnaround(restaurantId: string, day: string | null): Promise<TableTurnaround> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .rpc('get_table_turnaround', { p_restaurant_id: restaurantId, p_day: day })
+    .maybeSingle();
+
+  if (error) {
+    console.error('get_table_turnaround failed', error);
+    throw new Error('Could not load table turnaround times.');
+  }
+  return data ?? EMPTY_TURNAROUND;
+}
+
+export async function getStaffRequestTimings(
+  restaurantId: string,
+  day: string | null
+): Promise<StaffRequestTiming[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('get_staff_request_timings', {
+    p_restaurant_id: restaurantId,
+    p_day: day,
+  });
+
+  if (error) {
+    console.error('get_staff_request_timings failed', error);
+    throw new Error('Could not load request completion times.');
   }
   return data ?? [];
 }

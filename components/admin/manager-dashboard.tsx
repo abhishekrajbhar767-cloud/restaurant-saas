@@ -6,7 +6,15 @@ import { setMenuItemAvailability, setTableStatus } from '@/lib/manager/actions';
 import { AttendancePanel } from '@/components/admin/attendance-panel';
 import { MenuQuickActions } from '@/components/admin/menu-quick-actions';
 import { OrderFinancials } from '@/components/admin/order-financials';
-import { EMPTY_SIGNALS, TableMap, toneFor, type TableSignals, type TableTone } from '@/components/admin/table-map';
+import {
+  EMPTY_SIGNALS,
+  REQUEST_OVERDUE_MINUTES,
+  TableMap,
+  toneFor,
+  type TableSignals,
+  type TableTone,
+} from '@/components/admin/table-map';
+import { minutesSince } from '@/lib/shared/duration';
 import type {
   MenuCategory,
   MenuItem,
@@ -47,6 +55,9 @@ export function ManagerDashboard({
   const [orderVersion, setOrderVersion] = useState(0);
   const [pendingTableIds, setPendingTableIds] = useState<ReadonlySet<string>>(new Set());
   const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<string>>(new Set());
+  // Seeded on mount rather than at render so the server pass and the first
+  // client pass agree — Date.now() during SSR would hydrate mismatched.
+  const [nowMs, setNowMs] = useState(0);
 
   // Guards a second tap landing while the first write is still in flight —
   // without it the rollback path can restore a value the user already changed.
@@ -127,6 +138,14 @@ export function ManagerDashboard({
     return () => clearTimeout(id);
   }, [error]);
 
+  // Every timer on the map is rendered in whole minutes, so a 15s tick keeps
+  // them within a quarter-minute of the truth without re-rendering constantly.
+  useEffect(() => {
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
+
   const activeTables = useMemo(
     () =>
       tables
@@ -140,7 +159,7 @@ export function ManagerDashboard({
     const forTable = (tableId: string): TableSignals => {
       const existing = map.get(tableId);
       if (existing) return existing;
-      const created: TableSignals = { activeOrders: 0, readyOrders: 0, requestTypes: [] };
+      const created: TableSignals = { activeOrders: 0, readyOrders: 0, requestTypes: [], overdueMinutes: null };
       map.set(tableId, created);
       return created;
     };
@@ -153,9 +172,16 @@ export function ManagerDashboard({
     for (const request of requests) {
       const signals = forTable(request.table_id);
       if (!signals.requestTypes.includes(request.type)) signals.requestTypes.push(request.type);
+
+      // Only accepted work can be late. A pending request is still waiting to
+      // be picked up, which the red "Action needed" tone already covers.
+      if (request.status !== 'claimed' || !request.claimed_at || nowMs === 0) continue;
+      const waiting = minutesSince(request.claimed_at, nowMs);
+      if (waiting < REQUEST_OVERDUE_MINUTES) continue;
+      signals.overdueMinutes = Math.max(signals.overdueMinutes ?? 0, waiting);
     }
     return map;
-  }, [orders, requests]);
+  }, [orders, requests, nowMs]);
 
   const toneCounts = useMemo(() => {
     const counts: Record<TableTone, number> = { empty: 0, dining: 0, attention: 0 };
@@ -230,6 +256,7 @@ export function ManagerDashboard({
           signalsByTable={signalsByTable}
           hiddenCount={tables.length - activeTables.length}
           pendingIds={pendingTableIds}
+          nowMs={nowMs}
           onSetStatus={handleSetTableStatus}
         />
         <MenuQuickActions

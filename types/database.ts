@@ -52,7 +52,19 @@ export type RestaurantTable = {
   qr_token: string;
   is_active: boolean;
   status: TableStatus;
+  // Set by the track_table_session trigger, cleared when the table goes
+  // back to empty. Null means nobody is seated.
+  occupied_since: string | null;
   created_at: string;
+};
+
+export type TableSession = {
+  id: string;
+  restaurant_id: string;
+  table_id: string;
+  started_at: string;
+  billed_at: string | null;
+  ended_at: string | null;
 };
 
 export type MenuCategory = {
@@ -177,6 +189,23 @@ export type StaffShiftHistoryRow = {
   clock_in_longitude: number | null;
 };
 
+export type TableTurnaround = {
+  completed_sessions: number;
+  average_minutes: number | null;
+  longest_minutes: number;
+  open_sessions: number;
+};
+
+export type StaffRequestTiming = {
+  staff_id: string;
+  display_name: string | null;
+  email: string;
+  role: MemberRole;
+  requests_completed: number;
+  average_minutes: number | null;
+  longest_minutes: number;
+};
+
 export type ActiveShiftRow = {
   shift_id: string;
   staff_id: string;
@@ -265,6 +294,7 @@ export type Database = {
       service_requests: { Row: ServiceRequest; Insert: Partial<ServiceRequest>; Update: Partial<ServiceRequest>; Relationships: [] };
       waiter_status: { Row: WaiterStatusRow; Insert: Partial<WaiterStatusRow>; Update: Partial<WaiterStatusRow>; Relationships: [] };
       staff_shifts: { Row: StaffShift; Insert: Partial<StaffShift>; Update: Partial<StaffShift>; Relationships: [] };
+      table_sessions: { Row: TableSession; Insert: Partial<TableSession>; Update: Partial<TableSession>; Relationships: [] };
     };
     Functions: {
       create_order: { Args: { p_qr_token: string; p_lines: OrderLineInput[] }; Returns: string };
@@ -303,6 +333,14 @@ export type Database = {
       get_staff_shift_history: {
         Args: { p_restaurant_id: string; p_day?: string | null };
         Returns: StaffShiftHistoryRow[];
+      };
+      get_table_turnaround: {
+        Args: { p_restaurant_id: string; p_day?: string | null };
+        Returns: TableTurnaround;
+      };
+      get_staff_request_timings: {
+        Args: { p_restaurant_id: string; p_day?: string | null };
+        Returns: StaffRequestTiming[];
       };
     };
     Views: {

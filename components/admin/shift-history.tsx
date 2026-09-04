@@ -1,4 +1,5 @@
 import { ROLE_LABEL } from '@/lib/auth/roles';
+import { formatMinutes as formatHours } from '@/lib/shared/duration';
 import type { StaffShiftHistoryRow } from '@/types/database';
 
 type StaffGroup = {
@@ -103,13 +104,6 @@ function groupByStaff(rows: StaffShiftHistoryRow[]): StaffGroup[] {
   }
 
   return [...groups.values()];
-}
-
-function formatHours(minutes: number): string {
-  const safe = Math.max(minutes, 0);
-  const hours = Math.floor(safe / 60);
-  const rest = safe % 60;
-  return hours > 0 ? `${hours}h ${rest}m` : `${rest}m`;
 }
 
 function formatTime(value: string, timeZone: string): string {

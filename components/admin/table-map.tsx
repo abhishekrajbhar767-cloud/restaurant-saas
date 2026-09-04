@@ -1,6 +1,11 @@
 'use client';
 
+import { formatMinutes, minutesSince } from '@/lib/shared/duration';
 import type { RestaurantTable, ServiceRequestType, TableStatus } from '@/types/database';
+
+// A request someone accepted but hasn't closed out this long is no longer
+// "being handled" — it's a guest waiting, and the map should say so.
+export const REQUEST_OVERDUE_MINUTES = 5;
 
 // What the floor is actually doing right now, as opposed to the status a
 // manager last set by hand. Live signals win: a table someone forgot to mark
@@ -9,11 +14,18 @@ export type TableSignals = {
   activeOrders: number;
   readyOrders: number;
   requestTypes: ServiceRequestType[];
+  // Longest-running accepted request past the threshold, in minutes.
+  overdueMinutes: number | null;
 };
 
 export type TableTone = 'empty' | 'dining' | 'attention';
 
-export const EMPTY_SIGNALS: TableSignals = { activeOrders: 0, readyOrders: 0, requestTypes: [] };
+export const EMPTY_SIGNALS: TableSignals = {
+  activeOrders: 0,
+  readyOrders: 0,
+  requestTypes: [],
+  overdueMinutes: null,
+};
 
 export function toneFor(table: RestaurantTable, signals: TableSignals): TableTone {
   if (table.status === 'billed' || signals.requestTypes.length > 0 || signals.readyOrders > 0) return 'attention';
@@ -64,12 +76,14 @@ export function TableMap({
   signalsByTable,
   hiddenCount,
   pendingIds,
+  nowMs,
   onSetStatus,
 }: {
   tables: RestaurantTable[];
   signalsByTable: ReadonlyMap<string, TableSignals>;
   hiddenCount: number;
   pendingIds: ReadonlySet<string>;
+  nowMs: number;
   onSetStatus: (tableId: string, status: TableStatus) => void;
 }) {
   return (
@@ -101,6 +115,7 @@ export function TableMap({
               table={table}
               signals={signalsByTable.get(table.id) ?? EMPTY_SIGNALS}
               isPending={pendingIds.has(table.id)}
+              nowMs={nowMs}
               onSetStatus={onSetStatus}
             />
           ))}
@@ -120,14 +135,20 @@ function TableCard({
   table,
   signals,
   isPending,
+  nowMs,
   onSetStatus,
 }: {
   table: RestaurantTable;
   signals: TableSignals;
   isPending: boolean;
+  nowMs: number;
   onSetStatus: (tableId: string, status: TableStatus) => void;
 }) {
   const tone = toneFor(table, signals);
+  // nowMs is 0 until the dashboard's clock starts on mount; showing "0m" in
+  // that gap would be a visible flash of a wrong number.
+  const occupiedMinutes =
+    nowMs > 0 && table.occupied_since && table.status !== 'empty' ? minutesSince(table.occupied_since, nowMs) : null;
 
   return (
     <li
@@ -148,10 +169,21 @@ function TableCard({
       <span className={`mt-1.5 text-[11px] font-medium uppercase tracking-wide ${TONE_TEXT[tone]}`}>{TONE_LABEL[tone]}</span>
 
       <div className="mt-2 min-h-[34px] space-y-1.5">
+        {occupiedMinutes !== null && (
+          <p className="text-xs text-text-muted">
+            Occupied for <span className="font-mono tabular-nums text-text">{formatMinutes(occupiedMinutes)}</span>
+          </p>
+        )}
         {signals.activeOrders > 0 && (
           <p className="text-xs text-text-muted">
             {signals.activeOrders} live {signals.activeOrders === 1 ? 'order' : 'orders'}
             {signals.readyOrders > 0 && <span className="text-danger"> · {signals.readyOrders} ready</span>}
+          </p>
+        )}
+        {signals.overdueMinutes !== null && (
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-danger">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-danger" aria-hidden />
+            Overdue: {formatMinutes(signals.overdueMinutes)}
           </p>
         )}
         {signals.requestTypes.length > 0 && (

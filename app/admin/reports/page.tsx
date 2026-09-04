@@ -1,8 +1,15 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth/session';
 import { getRestaurantById } from '@/lib/restaurant/queries';
-import { getEodSummary, getStaffShiftHistory, getTopSellingItems } from '@/lib/restaurant/reports';
+import {
+  getEodSummary,
+  getStaffRequestTimings,
+  getStaffShiftHistory,
+  getTableTurnaround,
+  getTopSellingItems,
+} from '@/lib/restaurant/reports';
 import { EodSummaryCards } from '@/components/admin/eod-summary';
+import { OperationalTimings } from '@/components/admin/operational-timings';
 import { TopSellingItems } from '@/components/admin/top-selling-items';
 import { ShiftHistory } from '@/components/admin/shift-history';
 
@@ -20,10 +27,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: { da
   const requested = searchParams.date;
   const day = requested && DAY_PATTERN.test(requested) && requested <= today ? requested : today;
 
-  const [summary, topItems, shifts] = await Promise.all([
+  const [summary, topItems, shifts, turnaround, requestTimings] = await Promise.all([
     getEodSummary(restaurant.id, day),
     getTopSellingItems(restaurant.id, day, 10),
     getStaffShiftHistory(restaurant.id, day),
+    getTableTurnaround(restaurant.id, day),
+    getStaffRequestTimings(restaurant.id, day),
   ]);
 
   const previous = shiftDay(day, -1);
@@ -65,6 +74,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: { da
       </div>
 
       <EodSummaryCards summary={summary} />
+
+      <OperationalTimings turnaround={turnaround} timings={requestTimings} />
 
       <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
         <TopSellingItems items={topItems} />
