@@ -30,9 +30,18 @@ export type Restaurant = {
   longitude: number | null;
   geofence_radius_meters: number | null;
   google_review_url: string | null;
+  require_table_assignment: boolean;
+  enable_customer_name: boolean;
+  enable_customer_mobile: boolean;
   created_at: string;
   updated_at: string;
 };
+
+// The switches an owner can flip on /admin/settings.
+export type RestaurantFeatureToggle =
+  | 'require_table_assignment'
+  | 'enable_customer_name'
+  | 'enable_customer_mobile';
 
 export type RestaurantMember = {
   id: string;
@@ -370,6 +379,16 @@ export type Database = {
       submit_customer_rating: { Args: { p_order_id: string; p_rating: number }; Returns: void };
       get_customer_rating: { Args: { p_order_id: string }; Returns: number | null };
       set_restaurant_google_review_url: { Args: { p_restaurant_id: string; p_url: string | null }; Returns: void };
+      set_restaurant_feature_toggles: {
+        // Omitted or null means "leave that switch alone".
+        Args: {
+          p_restaurant_id: string;
+          p_require_table_assignment?: boolean | null;
+          p_enable_customer_name?: boolean | null;
+          p_enable_customer_mobile?: boolean | null;
+        };
+        Returns: void;
+      };
       get_staff_ratings: {
         Args: { p_restaurant_id: string; p_day?: string | null };
         Returns: StaffRating[];

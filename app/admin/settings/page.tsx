@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/auth/session';
 import { getRestaurantById } from '@/lib/restaurant/queries';
+import { FeatureToggles } from '@/components/admin/feature-toggles';
 import { GeofenceSettings } from '@/components/admin/geofence-settings';
 import { GoogleReviewSettings } from '@/components/admin/google-review-settings';
 
@@ -18,6 +19,7 @@ export default async function SettingsPage() {
         <p className="text-sm text-text-muted">{restaurant.name}</p>
       </div>
 
+      <FeatureToggles restaurant={restaurant} />
       <GeofenceSettings restaurant={restaurant} />
       <GoogleReviewSettings restaurant={restaurant} />
     </div>

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import type { RestaurantFeatureToggle } from '@/types/database';
 
 const GeofenceSchema = z.object({
   latitude: z.coerce.number().min(-90, 'Latitude must be between -90 and 90').max(90, 'Latitude must be between -90 and 90'),
@@ -91,6 +92,37 @@ export async function saveGoogleReviewUrl(formData: FormData): Promise<{ error: 
   });
 
   if (error) return { error: error.message || 'Could not save the review link.' };
+
+  revalidatePath('/admin/settings');
+  return { error: null };
+}
+
+const ToggleSchema = z.object({
+  setting: z.enum(['require_table_assignment', 'enable_customer_name', 'enable_customer_mobile']),
+  enabled: z.boolean(),
+});
+
+export async function setFeatureToggle(
+  setting: RestaurantFeatureToggle,
+  enabled: boolean
+): Promise<{ error: string | null }> {
+  const restaurantId = await requireTenant();
+
+  const parsed = ToggleSchema.safeParse({ setting, enabled });
+  if (!parsed.success) return { error: 'That setting does not exist.' };
+
+  const supabase = createClient();
+  // Only the switch that changed is sent; the RPC leaves the null ones as
+  // they are, so two people editing different switches cannot clobber
+  // each other with a stale copy of the whole set.
+  const { error } = await supabase.rpc('set_restaurant_feature_toggles', {
+    p_restaurant_id: restaurantId,
+    p_require_table_assignment: parsed.data.setting === 'require_table_assignment' ? parsed.data.enabled : null,
+    p_enable_customer_name: parsed.data.setting === 'enable_customer_name' ? parsed.data.enabled : null,
+    p_enable_customer_mobile: parsed.data.setting === 'enable_customer_mobile' ? parsed.data.enabled : null,
+  });
+
+  if (error) return { error: error.message || 'Could not save that setting.' };
 
   revalidatePath('/admin/settings');
   return { error: null };
