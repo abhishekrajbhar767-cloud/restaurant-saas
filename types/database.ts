@@ -114,6 +114,9 @@ export type Order = {
   void_reason: string | null;
   estimated_minutes: number | null;
   cancellation_reason: string | null;
+  // Only populated when the restaurant has the matching toggle switched on.
+  customer_name: string | null;
+  customer_mobile: string | null;
   created_at: string;
   accepted_at: string | null;
   preparing_at: string | null;
@@ -331,7 +334,15 @@ export type Database = {
       customer_ratings: { Row: CustomerRating; Insert: Partial<CustomerRating>; Update: Partial<CustomerRating>; Relationships: [] };
     };
     Functions: {
-      create_order: { Args: { p_qr_token: string; p_lines: OrderLineInput[] }; Returns: string };
+      create_order: {
+        Args: {
+          p_qr_token: string;
+          p_lines: OrderLineInput[];
+          p_customer_name?: string | null;
+          p_customer_mobile?: string | null;
+        };
+        Returns: string;
+      };
       kitchen_accept_order: { Args: { p_order_id: string; p_estimated_minutes: number }; Returns: void };
       update_order_status: { Args: { p_order_id: string; p_new_status: OrderStatus; p_cancellation_reason?: string | null }; Returns: void };
       create_service_request: { Args: { p_qr_token: string; p_type: ServiceRequestType }; Returns: string };

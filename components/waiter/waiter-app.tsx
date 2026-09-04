@@ -28,6 +28,8 @@ export function WaiterApp({
   categories,
   menuItems,
   currency,
+  askName,
+  askMobile,
 }: {
   restaurantId: string;
   memberId: string;
@@ -37,6 +39,8 @@ export function WaiterApp({
   categories: MenuCategory[];
   menuItems: MenuItem[];
   currency: string;
+  askName: boolean;
+  askMobile: boolean;
 }) {
   const [availability, setAvailability] = useState<WaiterAvailability>(initialAvailability);
   const [requests, setRequests] = useState<ServiceRequestWithTable[]>(initialRequests);
@@ -273,6 +277,8 @@ export function WaiterApp({
           categories={categories}
           items={menuItems}
           currency={currency}
+          askName={askName}
+          askMobile={askMobile}
           onClose={() => setOrderSheetOpen(false)}
           onPlaced={(message) => {
             setOrderSheetOpen(false);

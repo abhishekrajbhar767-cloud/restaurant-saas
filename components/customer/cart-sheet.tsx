@@ -15,6 +15,9 @@ export function CartSheet({
   tableQrToken,
   tableId,
   currency,
+  askName,
+  askMobile,
+  needsSeating,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,16 +28,31 @@ export function CartSheet({
   tableQrToken: string;
   tableId: string;
   currency: string;
+  askName: boolean;
+  askMobile: boolean;
+  needsSeating: boolean;
 }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [mobile, setMobile] = useState('');
   const submittedRef = useRef(false); // synchronous guard — blocks a double-tap before React state even updates
 
   if (!open) return null;
 
   async function handlePlaceOrder() {
     if (submittedRef.current) return;
+
+    if (askName && name.trim() === '') {
+      setError('Please enter your name.');
+      return;
+    }
+    if (askMobile && digitsIn(mobile) < 7) {
+      setError('Please enter a valid mobile number.');
+      return;
+    }
+
     submittedRef.current = true;
     setIsSubmitting(true);
     setError(null);
@@ -47,12 +65,14 @@ export function CartSheet({
         quantity: line.quantity,
         special_instructions: line.specialInstructions || null,
       })),
+      p_customer_name: askName ? name.trim() : null,
+      p_customer_mobile: askMobile ? mobile.trim() : null,
     });
 
     if (rpcError || !orderId) {
       submittedRef.current = false;
       setIsSubmitting(false);
-      setError(rpcError?.message?.includes('unavailable') ? rpcError.message : 'Could not place your order. Please try again.');
+      setError(friendlyOrderError(rpcError?.message ?? ''));
       return;
     }
 
@@ -116,6 +136,53 @@ export function CartSheet({
 
         {cart.length > 0 && (
           <div className="border-t border-ink-950/10 px-5 py-4 space-y-3">
+            {(askName || askMobile) && (
+              <div className="space-y-2">
+                {askName && (
+                  <div>
+                    <label htmlFor="customerName" className="text-xs font-medium text-text-onPaper/60">
+                      Your name
+                    </label>
+                    <input
+                      id="customerName"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoComplete="name"
+                      maxLength={80}
+                      placeholder="Name"
+                      className="mt-1 w-full rounded border border-ink-950/15 bg-white/60 px-2.5 py-2 text-sm placeholder:text-text-onPaper/40"
+                    />
+                  </div>
+                )}
+                {askMobile && (
+                  <div>
+                    <label htmlFor="customerMobile" className="text-xs font-medium text-text-onPaper/60">
+                      Mobile number
+                    </label>
+                    <input
+                      id="customerMobile"
+                      type="tel"
+                      inputMode="tel"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      autoComplete="tel"
+                      maxLength={20}
+                      placeholder="Mobile number"
+                      className="mt-1 w-full rounded border border-ink-950/15 bg-white/60 px-2.5 py-2 text-sm placeholder:text-text-onPaper/40"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {needsSeating && (
+              <p className="rounded border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-text-onPaper/70">
+                This restaurant takes orders from seated tables only. If nobody has seated you yet, please call a staff
+                member first.
+              </p>
+            )}
+
             <div className="flex items-center justify-between font-display font-bold">
               <span>Total</span>
               <span className="font-mono">{currency} {cartTotal(cart).toLocaleString('en-IN')}</span>
@@ -133,4 +200,20 @@ export function CartSheet({
       </div>
     </div>
   );
+}
+
+function digitsIn(value: string): number {
+  return value.replace(/\D/g, '').length;
+}
+
+// create_order raises tagged messages so the customer sees something they can
+// act on instead of a Postgres error.
+function friendlyOrderError(message: string): string {
+  if (message.includes('TABLE_NOT_SEATED')) {
+    return 'Please ask a staff member to seat you before ordering.';
+  }
+  if (message.includes('CUSTOMER_NAME_REQUIRED')) return 'Please enter your name.';
+  if (message.includes('CUSTOMER_MOBILE_REQUIRED')) return 'Please enter a valid mobile number.';
+  if (message.includes('unavailable')) return message;
+  return 'Could not place your order. Please try again.';
 }

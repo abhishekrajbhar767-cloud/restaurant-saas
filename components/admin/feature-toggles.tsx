@@ -7,8 +7,9 @@ import type { Restaurant, RestaurantFeatureToggle } from '@/types/database';
 const TOGGLES: { setting: RestaurantFeatureToggle; label: string; description: string }[] = [
   {
     setting: 'require_table_assignment',
-    label: 'Require a table on every order',
-    description: 'Turn this off for takeaway or counter service, where an order need not belong to a table.',
+    label: 'Only accept orders from seated tables',
+    description:
+      'Blocks QR orders until staff mark the table as dining, so nobody can photograph a code and order from home. Waiters taking orders in person are never blocked.',
   },
   {
     setting: 'enable_customer_name',

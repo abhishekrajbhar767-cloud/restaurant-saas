@@ -11,6 +11,8 @@ export function NewOrderSheet({
   categories,
   items,
   currency,
+  askName,
+  askMobile,
   onClose,
   onPlaced,
 }: {
@@ -18,6 +20,8 @@ export function NewOrderSheet({
   categories: MenuCategory[];
   items: MenuItem[];
   currency: string;
+  askName: boolean;
+  askMobile: boolean;
   onClose: () => void;
   onPlaced: (message: string) => void;
 }) {
@@ -25,6 +29,8 @@ export function NewOrderSheet({
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerMobile, setCustomerMobile] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -71,6 +77,14 @@ export function NewOrderSheet({
       setError('Pick a table first.');
       return;
     }
+    if (askName && customerName.trim() === '') {
+      setError("Enter the customer's name.");
+      return;
+    }
+    if (askMobile && customerMobile.replace(/\D/g, '').length < 7) {
+      setError('Enter a valid mobile number.');
+      return;
+    }
 
     startTransition(async () => {
       const result = await createWaiterOrder({
@@ -80,6 +94,8 @@ export function NewOrderSheet({
           quantity: line.quantity,
           note: line.note.trim() || undefined,
         })),
+        customerName: askName ? customerName.trim() : undefined,
+        customerMobile: askMobile ? customerMobile.trim() : undefined,
       });
 
       if (result.error) {
@@ -125,6 +141,44 @@ export function NewOrderSheet({
             </select>
           )}
         </div>
+
+        {(askName || askMobile) && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {askName && (
+              <div>
+                <label htmlFor="customerName" className="field-label">
+                  Customer name
+                </label>
+                <input
+                  id="customerName"
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  maxLength={80}
+                  placeholder="Name"
+                  className="field-input"
+                />
+              </div>
+            )}
+            {askMobile && (
+              <div>
+                <label htmlFor="customerMobile" className="field-label">
+                  Mobile number
+                </label>
+                <input
+                  id="customerMobile"
+                  type="tel"
+                  inputMode="tel"
+                  value={customerMobile}
+                  onChange={(e) => setCustomerMobile(e.target.value)}
+                  maxLength={20}
+                  placeholder="Mobile number"
+                  className="field-input"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label htmlFor="itemSearch" className="sr-only">

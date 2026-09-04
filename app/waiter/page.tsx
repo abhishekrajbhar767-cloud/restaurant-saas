@@ -40,6 +40,8 @@ export default async function WaiterPage() {
       categories={categories.filter((c) => c.is_active)}
       menuItems={menuItems.filter((i) => i.is_available)}
       currency={restaurant.currency}
+      askName={restaurant.enable_customer_name}
+      askMobile={restaurant.enable_customer_mobile}
     />
   );
 }

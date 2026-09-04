@@ -16,6 +16,8 @@ const OrderSchema = z.object({
       })
     )
     .min(1, 'Add at least one item.'),
+  customerName: z.string().trim().max(80).optional(),
+  customerMobile: z.string().trim().max(20).optional(),
 });
 
 export type WaiterOrderInput = z.input<typeof OrderSchema>;
@@ -58,10 +60,13 @@ export async function createWaiterOrder(input: WaiterOrderInput): Promise<Waiter
   }));
 
   // Deliberately the same RPC a customer's QR order goes through, so the
-  // resulting order is indistinguishable on the kitchen board.
+  // resulting order is indistinguishable on the kitchen board — and so the
+  // restaurant's name/mobile toggles are enforced in exactly one place.
   const { data: orderId, error } = await supabase.rpc('create_order', {
     p_qr_token: table.qr_token,
     p_lines: lines,
+    p_customer_name: parsed.data.customerName || null,
+    p_customer_mobile: parsed.data.customerMobile || null,
   });
 
   if (error || !orderId) {

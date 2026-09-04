@@ -181,6 +181,9 @@ export function MenuApp({
         tableQrToken={table.qr_token}
         tableId={table.id}
         currency={restaurant.currency}
+        askName={restaurant.enable_customer_name}
+        askMobile={restaurant.enable_customer_mobile}
+        needsSeating={restaurant.require_table_assignment && table.status === 'empty'}
       />
     </div>
   );
