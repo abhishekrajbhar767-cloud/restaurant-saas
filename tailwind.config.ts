@@ -27,6 +27,23 @@ const config: Config = {
         success: '#4FA876',
         danger: '#D65F5F',
         info: '#5B8FD6',
+        // Customer menu (dark, food-app aesthetic). Kept separate from the
+        // staff `ink` chrome so the two surfaces can evolve independently.
+        surface: {
+          950: '#0B0B0D',
+          900: '#141416',
+          800: '#1C1C1F',
+          700: '#26262B',
+        },
+        brand: {
+          DEFAULT: '#E23744',
+          bright: '#F0525E',
+          dim: '#B72A36',
+        },
+        rating: '#267E3E',
+        veg: '#2EA043',
+        nonveg: '#E43B4F',
+        egg: '#D9A129',
       },
       fontFamily: {
         display: ['var(--font-display)', 'sans-serif'],

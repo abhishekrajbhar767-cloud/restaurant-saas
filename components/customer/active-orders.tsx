@@ -20,10 +20,10 @@ const STATUS_LABEL: Partial<Record<OrderStatus, string>> = {
 };
 
 const STATUS_STYLE: Partial<Record<OrderStatus, string>> = {
-  placed: 'bg-ink-950/10 text-text-onPaper/70',
-  accepted: 'bg-amber/20 text-ink-950',
-  preparing: 'bg-amber/20 text-ink-950',
-  ready: 'bg-success/20 text-ink-950',
+  placed: 'bg-white/10 text-zinc-200',
+  accepted: 'bg-amber/20 text-amber-bright',
+  preparing: 'bg-amber/20 text-amber-bright',
+  ready: 'bg-success/20 text-success',
 };
 
 const ACTIVE_STATUSES: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready'];
@@ -92,33 +92,31 @@ export function ActiveOrders({
   if (!loaded || orders.length === 0) return null;
 
   return (
-    <section className="px-5 pb-1" aria-label="My active orders">
-      <h2 className="font-display font-bold text-sm uppercase tracking-wide text-text-onPaper/50 mt-4 mb-2">My Active Orders</h2>
+    <section className="px-4 pb-1 sm:px-6" aria-label="My active orders">
+      <h2 className="mt-5 mb-2 font-display text-[11px] font-semibold uppercase tracking-wider text-zinc-500">My active orders</h2>
       <div className="space-y-2">
         {orders.map((order) => (
           <Link
             key={order.id}
             href={`/menu/${restaurantSlug}/order/${order.id}?table=${tableQrToken}`}
-            className="block rounded-lg border border-ink-950/10 bg-white/60 px-4 py-3 active:bg-ink-950/5"
+            className="block rounded-xl border border-white/[0.06] bg-surface-800 px-4 py-3 transition-colors hover:bg-surface-700 active:bg-surface-700"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <span className="font-mono text-xs text-text-onPaper/50">#{order.order_number}</span>
-                <p className="font-medium text-sm truncate">
-                  {summarizeItems(order.items)}
-                </p>
+                <span className="font-mono text-xs text-zinc-500">#{order.order_number}</span>
+                <p className="truncate text-sm font-medium text-white">{summarizeItems(order.items)}</p>
               </div>
-              <div className="text-right shrink-0">
-                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-display ${STATUS_STYLE[order.status] ?? ''}`}>
+              <div className="shrink-0 text-right">
+                <span className={`inline-block rounded-full px-2.5 py-0.5 font-display text-xs font-semibold ${STATUS_STYLE[order.status] ?? ''}`}>
                   {STATUS_LABEL[order.status] ?? order.status}
                 </span>
-                {countdownFor(order) && <p className="font-mono text-xs text-amber-dim mt-1">{countdownFor(order)}</p>}
+                {countdownFor(order) && <p className="mt-1 font-mono text-xs text-amber-bright">{countdownFor(order)}</p>}
               </div>
             </div>
           </Link>
         ))}
       </div>
-      <p className="text-[11px] text-text-onPaper/40 mt-1">Tap an order to see the full tracker · {currency}</p>
+      <p className="mt-1.5 text-[11px] text-zinc-500">Tap an order to see the full tracker · {currency}</p>
     </section>
   );
 }

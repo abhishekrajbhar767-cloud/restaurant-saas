@@ -58,10 +58,10 @@ export default async function CustomerMenuPage({
 
 function ErrorScreen({ title, message }: { title: string; message: string }) {
   return (
-    <div className="min-h-screen bg-paper text-text-onPaper flex items-center justify-center px-6">
+    <div className="flex min-h-screen items-center justify-center bg-surface-950 px-6 text-white">
       <div className="max-w-sm text-center">
-        <h1 className="font-display text-xl font-bold mb-2">{title}</h1>
-        <p className="text-sm text-text-onPaper/70">{message}</p>
+        <h1 className="mb-2 font-display text-xl font-bold">{title}</h1>
+        <p className="text-sm text-zinc-400">{message}</p>
       </div>
     </div>
   );

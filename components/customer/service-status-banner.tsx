@@ -56,9 +56,9 @@ export function ServiceStatusBanner({ tableId }: { tableId: string }) {
   if (requests.length === 0) return null;
 
   return (
-    <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-amber/15 border-b border-amber/30 space-y-1">
+    <div className="mb-2 space-y-1 border-b border-amber/30 bg-amber/15 px-4 py-2 sm:px-6">
       {requests.map((r) => (
-        <p key={r.id} role="status" className="text-sm text-ink-950">
+        <p key={r.id} role="status" className="text-sm text-amber-bright">
           {r.status === 'claimed' ? CLAIMED_MESSAGE[r.type] : PENDING_MESSAGE[r.type]}
         </p>
       ))}

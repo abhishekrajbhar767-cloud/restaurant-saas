@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { BellIcon, CheckIcon, DropletIcon, PlusIcon, ReceiptIcon, XIcon } from '@/components/customer/icons';
 import type { ServiceRequestType } from '@/types/database';
 
-const ACTIONS: { type: ServiceRequestType; label: string; icon: string }[] = [
-  { type: 'waiter', label: 'Call Waiter', icon: '🙋' },
-  { type: 'water', label: 'Water', icon: '💧' },
-  { type: 'bill', label: 'Bill', icon: '🧾' },
+const ACTIONS: { type: ServiceRequestType; label: string; Icon: typeof BellIcon }[] = [
+  { type: 'waiter', label: 'Call Waiter', Icon: BellIcon },
+  { type: 'water', label: 'Water', Icon: DropletIcon },
+  { type: 'bill', label: 'Bill', Icon: ReceiptIcon },
 ];
 
 export function QuickActions({ tableId, tableQrToken }: { tableId: string; tableQrToken: string }) {
@@ -84,30 +85,33 @@ export function QuickActions({ tableId, tableQrToken }: { tableId: string; table
   return (
     <>
       {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-ink-950 text-paper text-sm px-4 py-2 rounded-full shadow-lg" role="status">
+        <div
+          className="fixed bottom-40 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium text-surface-950 shadow-xl"
+          role="status"
+        >
           {toast}
         </div>
       )}
 
       <div className="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-2">
         {open &&
-          ACTIONS.map((a) => {
-            const isActive = activeTypes.has(a.type);
+          ACTIONS.map(({ type, label, Icon }) => {
+            const isActive = activeTypes.has(type);
             return (
               <button
-                key={a.type}
-                onClick={() => request(a.type, a.label)}
+                key={type}
+                onClick={() => request(type, label)}
                 disabled={pending !== null || isActive}
                 aria-disabled={isActive}
                 title={isActive ? 'Already requested — staff is on the way' : undefined}
-                className={`flex items-center gap-2 shadow-lg rounded-full pl-3 pr-4 py-2 text-sm font-display border transition-colors ${
+                className={`flex items-center gap-2 rounded-full border py-2 pl-3 pr-4 font-display text-sm shadow-xl shadow-black/50 transition-colors ${
                   isActive
-                    ? 'bg-amber/20 border-amber/50 text-ink-950'
-                    : 'bg-paper text-text-onPaper border-ink-950/10 hover:bg-ink-950/5 disabled:opacity-60'
+                    ? 'border-success/50 bg-success/15 text-white'
+                    : 'border-white/10 bg-surface-800 text-white hover:bg-surface-700 disabled:opacity-60'
                 }`}
               >
-                <span aria-hidden>{a.icon}</span>
-                {pending === a.type ? 'Sending…' : isActive ? `${a.label} — requested ✓` : a.label}
+                {isActive ? <CheckIcon size={16} className="text-success" /> : <Icon size={16} className="text-zinc-300" />}
+                {pending === type ? 'Sending…' : isActive ? `${label} — requested` : label}
               </button>
             );
           })}
@@ -116,9 +120,11 @@ export function QuickActions({ tableId, tableQrToken }: { tableId: string; table
           onClick={() => setOpen((s) => !s)}
           aria-expanded={open}
           aria-label={open ? 'Close quick actions' : 'Open quick actions'}
-          className="h-12 w-12 rounded-full bg-amber text-ink-950 shadow-lg flex items-center justify-center text-xl font-display"
+          className={`flex h-12 w-12 items-center justify-center rounded-full shadow-xl shadow-black/50 ring-1 ring-white/10 transition-colors ${
+            open ? 'bg-surface-700 text-white' : 'bg-brand text-white hover:bg-brand-bright'
+          }`}
         >
-          {open ? '×' : '+'}
+          {open ? <XIcon size={20} /> : <PlusIcon size={22} />}
         </button>
       </div>
     </>
