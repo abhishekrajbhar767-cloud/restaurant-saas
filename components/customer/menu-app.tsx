@@ -7,6 +7,7 @@ import { QuickActions } from '@/components/customer/quick-actions';
 import { ActiveOrders } from '@/components/customer/active-orders';
 import { ServiceStatusBanner } from '@/components/customer/service-status-banner';
 import { MenuHeader, type RestaurantRating } from '@/components/customer/menu-header';
+import { BrowseOnlyBanner } from '@/components/customer/browse-only-banner';
 import { FilterBar, DEFAULT_FILTERS, QUICK_PREP_MINUTES, type MenuFilters } from '@/components/customer/filter-bar';
 import { MenuSection } from '@/components/customer/menu-section';
 import { ChevronRightIcon, MenuBookIcon, SearchIcon, XIcon } from '@/components/customer/icons';
@@ -23,14 +24,23 @@ export function MenuApp({
   categories,
   items,
   rating = null,
+  tableCodeRejected = false,
 }: {
   restaurant: Restaurant;
-  table: RestaurantTable;
+  /**
+   * The scanned table, or `null` for browse-only mode (a menu link shared
+   * publicly). Browse-only renders no ordering affordance at all — see the
+   * `ordering` prop threaded into each `ItemCard`.
+   */
+  table: RestaurantTable | null;
   categories: MenuCategory[];
   items: MenuItem[];
   /** Aggregate customer rating, when the caller has one. Renders a "New" badge otherwise. */
   rating?: RestaurantRating | null;
+  /** Browse-only because the supplied table code didn't resolve, not because it was absent. */
+  tableCodeRejected?: boolean;
 }) {
+  const browseOnly = table === null;
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartLoaded, setCartLoaded] = useState(false);
   const [search, setSearch] = useState('');
@@ -40,12 +50,13 @@ export function MenuApp({
   const [toast, setToast] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [tableStatus, setTableStatus] = useState<TableStatus>(table.status);
+  const [tableStatus, setTableStatus] = useState<TableStatus>(table?.status ?? 'empty');
 
   useEffect(() => {
+    if (!table) return;
     setCart(loadCart(table.id));
     setCartLoaded(true);
-  }, [table.id]);
+  }, [table]);
 
   useEffect(() => {
     setSaved(loadSaved(restaurant.id));
@@ -58,12 +69,14 @@ export function MenuApp({
   // tables_select_public is what lets an anonymous guest receive their own
   // table's row.
   useEffect(() => {
+    if (!table) return; // browse-only: nothing to watch, and no ordering to unlock
+    const tableId = table.id;
     const supabase = createClient();
     const channel = supabase
-      .channel(`menu-table-${table.id}`)
+      .channel(`menu-table-${tableId}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${table.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` },
         (payload) => setTableStatus((payload.new as RestaurantTable).status)
       )
       .subscribe();
@@ -71,14 +84,14 @@ export function MenuApp({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [table.id]);
+  }, [table]);
 
   // Don't persist until the stored cart has been read, otherwise the initial
   // empty state would overwrite a cart the guest built before a refresh.
   useEffect(() => {
-    if (!cartLoaded) return;
+    if (!table || !cartLoaded) return;
     saveCart(table.id, cart);
-  }, [table.id, cart, cartLoaded]);
+  }, [table, cart, cartLoaded]);
 
   useEffect(() => {
     if (!toast) return;
@@ -169,22 +182,24 @@ export function MenuApp({
     });
   }
 
-  async function shareItem(item: MenuItem) {
-    const text = `${item.name} · ${formatPrice(item.price)} at ${restaurant.name}`;
-    const url = typeof window !== 'undefined' ? window.location.href : '';
+  async function share(title: string, text: string) {
+    const url = publicMenuUrl();
     try {
       if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: item.name, text, url });
+        await navigator.share({ title, text, url });
         return;
       }
       await navigator.clipboard.writeText(`${text}\n${url}`);
-      setToast('Copied to clipboard');
+      setToast('Link copied to clipboard');
     } catch (err) {
       // AbortError = the user closed the share sheet; not worth a toast.
       if (err instanceof Error && err.name === 'AbortError') return;
       setToast("Couldn't share right now");
     }
   }
+
+  const shareItem = (item: MenuItem) => share(item.name, `${item.name} · ${formatPrice(item.price)} at ${restaurant.name}`);
+  const shareMenu = () => share(restaurant.name, `Take a look at the menu from ${restaurant.name}`);
 
   function toggleSection(id: string) {
     setCollapsed((prev) => {
@@ -211,9 +226,15 @@ export function MenuApp({
     <ItemCard
       key={item.id}
       item={item}
-      quantityInCart={quantityFor(item.id)}
-      onAdd={() => addToCart(item)}
-      onRemove={() => updateQuantity(item.id, quantityFor(item.id) - 1)}
+      ordering={
+        browseOnly
+          ? null
+          : {
+              quantityInCart: quantityFor(item.id),
+              onAdd: () => addToCart(item),
+              onRemove: () => updateQuantity(item.id, quantityFor(item.id) - 1),
+            }
+      }
       saved={saved.has(item.id)}
       onToggleSave={() => toggleSaved(item.id)}
       onShare={() => shareItem(item)}
@@ -227,13 +248,15 @@ export function MenuApp({
   const tagline = categories.length > 0 ? categories.slice(0, 3).map((c) => c.name).join(', ') : 'Dine-in menu';
 
   return (
-    <div className="mx-auto w-full max-w-3xl pb-32 lg:max-w-5xl">
+    <div className={`mx-auto w-full max-w-3xl lg:max-w-5xl ${browseOnly ? 'pb-24' : 'pb-32'}`}>
+      {browseOnly && <BrowseOnlyBanner tableCodeRejected={tableCodeRejected} onShare={shareMenu} />}
+
       <MenuHeader restaurant={restaurant} table={table} rating={rating} prepRange={prepRange} tagline={tagline} />
 
-      <ActiveOrders tableId={table.id} restaurantSlug={restaurant.slug} tableQrToken={table.qr_token} currency={restaurant.currency} />
+      {table && <ActiveOrders tableId={table.id} restaurantSlug={restaurant.slug} tableQrToken={table.qr_token} currency={restaurant.currency} />}
 
       <div className="sticky top-0 z-30 mt-4 bg-surface-950/95 pt-1 backdrop-blur supports-[backdrop-filter]:bg-surface-950/80">
-        <ServiceStatusBanner tableId={table.id} />
+        {table && <ServiceStatusBanner tableId={table.id} />}
         <div className="px-4 pb-3 sm:px-6">
           <label className="relative block">
             <span className="sr-only">Search menu</span>
@@ -316,7 +339,7 @@ export function MenuApp({
 
       {/* Floating category jump list — Zomato's bottom "Menu" pill. */}
       {!isSearching && visibleCategories.length > 0 && (
-        <div className="fixed bottom-24 left-4 z-40 sm:left-1/2 sm:-translate-x-1/2">
+        <div className={`fixed left-4 z-40 sm:left-1/2 sm:-translate-x-1/2 ${browseOnly ? 'bottom-6' : 'bottom-24'}`}>
           <button
             type="button"
             onClick={() => setNavOpen((o) => !o)}
@@ -335,7 +358,9 @@ export function MenuApp({
           <button type="button" aria-label="Close menu sections" onClick={() => setNavOpen(false)} className="absolute inset-0 bg-black/60" />
           <nav
             id="menu-jump-list"
-            className="absolute bottom-40 left-4 right-4 mx-auto max-h-[55vh] max-w-sm overflow-y-auto rounded-2xl bg-surface-800 p-2 shadow-2xl ring-1 ring-white/10 sm:left-1/2 sm:right-auto sm:w-80 sm:-translate-x-1/2"
+            className={`absolute left-4 right-4 mx-auto max-h-[55vh] max-w-sm overflow-y-auto rounded-2xl bg-surface-800 p-2 shadow-2xl ring-1 ring-white/10 sm:left-1/2 sm:right-auto sm:w-80 sm:-translate-x-1/2 ${
+              browseOnly ? 'bottom-24' : 'bottom-40'
+            }`}
           >
             {recommended.length > 0 && (
               <JumpRow label="Recommended for you" count={recommended.length} onClick={() => jumpToSection(RECOMMENDED_ID)} />
@@ -347,18 +372,20 @@ export function MenuApp({
         </div>
       )}
 
-      <QuickActions tableId={table.id} tableQrToken={table.qr_token} />
+      {table && <QuickActions tableId={table.id} tableQrToken={table.qr_token} />}
 
       {toast && (
         <div
           role="status"
-          className="fixed bottom-40 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium text-surface-950 shadow-xl"
+          className={`fixed left-1/2 z-50 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium text-surface-950 shadow-xl ${
+            browseOnly ? 'bottom-24' : 'bottom-40'
+          }`}
         >
           {toast}
         </div>
       )}
 
-      {cart.length > 0 && (
+      {table && cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pt-6 bg-gradient-to-t from-surface-950 via-surface-950/90 to-transparent">
           <button
             type="button"
@@ -379,20 +406,22 @@ export function MenuApp({
         </div>
       )}
 
-      <CartSheet
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-        cart={cart}
-        onUpdateQuantity={updateQuantity}
-        onUpdateInstructions={updateInstructions}
-        restaurantSlug={restaurant.slug}
-        tableQrToken={table.qr_token}
-        tableId={table.id}
-        currency={restaurant.currency}
-        askName={restaurant.enable_customer_name}
-        askMobile={restaurant.enable_customer_mobile}
-        needsSeating={restaurant.require_table_assignment && tableStatus === 'empty'}
-      />
+      {table && (
+        <CartSheet
+          open={cartOpen}
+          onClose={() => setCartOpen(false)}
+          cart={cart}
+          onUpdateQuantity={updateQuantity}
+          onUpdateInstructions={updateInstructions}
+          restaurantSlug={restaurant.slug}
+          tableQrToken={table.qr_token}
+          tableId={table.id}
+          currency={restaurant.currency}
+          askName={restaurant.enable_customer_name}
+          askMobile={restaurant.enable_customer_mobile}
+          needsSeating={restaurant.require_table_assignment && tableStatus === 'empty'}
+        />
+      )}
     </div>
   );
 }
@@ -412,6 +441,16 @@ function JumpRow({ label, count, onClick }: { label: string; count: number; onCl
 
 function EmptyState({ message }: { message: string }) {
   return <p className="py-14 text-center text-sm text-zinc-500">{message}</p>;
+}
+
+// Anything shared out of here drops the ?table= QR token: that token is a
+// table's ordering credential, and a link posted to WhatsApp should land the
+// next person in browse-only mode rather than on someone else's table.
+function publicMenuUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const url = new URL(window.location.href);
+  url.searchParams.delete('table');
+  return url.toString();
 }
 
 // Saved dishes live per restaurant in localStorage — a customer's "bookmarks"

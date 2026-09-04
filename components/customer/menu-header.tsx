@@ -14,7 +14,8 @@ export function MenuHeader({
   tagline,
 }: {
   restaurant: Restaurant;
-  table: RestaurantTable;
+  /** `null` in browse-only mode — no table context, so no table-scoped copy. */
+  table: RestaurantTable | null;
   rating: RestaurantRating | null;
   /** [min, max] prep time in minutes across available items, or null when the menu is empty. */
   prepRange: [number, number] | null;
@@ -52,7 +53,7 @@ export function MenuHeader({
         <div className="flex items-center gap-1.5">
           <MapPinIcon size={15} className="text-zinc-400" />
           <dt className="sr-only">Location</dt>
-          <dd>{distanceKm !== null ? `${formatDistance(distanceKm)} · Table ${table.table_number}` : `Dine-in · Table ${table.table_number}`}</dd>
+          <dd>{[distanceKm !== null ? formatDistance(distanceKm) : null, table ? `Table ${table.table_number}` : 'Dine-in'].filter(Boolean).join(' · ')}</dd>
         </div>
         {prepRange && (
           <>
@@ -72,7 +73,11 @@ export function MenuHeader({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">Dine-in exclusive · No delivery charges</p>
-          <p className="truncate text-xs text-zinc-400">Order from your table, track it live, call a waiter anytime</p>
+          <p className="truncate text-xs text-zinc-400">
+            {table
+              ? 'Order from your table, track it live, call a waiter anytime'
+              : 'Visit us, scan the QR at your table and order in seconds'}
+          </p>
         </div>
       </div>
     </header>

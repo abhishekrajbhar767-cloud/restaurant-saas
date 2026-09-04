@@ -22,19 +22,26 @@ export function formatPrice(value: number): string {
   return `₹${Number(value).toLocaleString('en-IN')}`;
 }
 
+/**
+ * Ordering controls for one row. `null` puts the card in browse-only mode:
+ * there is then no code path that can render an ADD button, which is the point
+ * — a publicly shared menu must not be able to start an order.
+ */
+export type ItemOrdering = {
+  quantityInCart: number;
+  onAdd: () => void;
+  onRemove: () => void;
+};
+
 export function ItemCard({
   item,
-  quantityInCart,
-  onAdd,
-  onRemove,
+  ordering,
   saved,
   onToggleSave,
   onShare,
 }: {
   item: MenuItem;
-  quantityInCart: number;
-  onAdd: () => void;
-  onRemove: () => void;
+  ordering: ItemOrdering | null;
   saved: boolean;
   onToggleSave: () => void;
   onShare: () => void;
@@ -122,43 +129,59 @@ export function ItemCard({
             </div>
           )}
 
-          <div className="absolute inset-x-0 -bottom-4 flex justify-center">
-            {item.is_available ? (
-              quantityInCart > 0 ? (
+          {/* Sold-out stays visible while browsing; ADD only exists when ordering is live. */}
+          {!item.is_available ? (
+            <div className="absolute inset-x-0 -bottom-4 flex justify-center">
+              <span className="flex h-9 w-[104px] items-center justify-center rounded-lg border border-white/10 bg-surface-900 font-display text-xs font-semibold text-zinc-500">
+                Sold out
+              </span>
+            </div>
+          ) : ordering ? (
+            <div className="absolute inset-x-0 -bottom-4 flex justify-center">
+              {ordering.quantityInCart > 0 ? (
                 <div
                   className="flex h-9 w-[104px] items-stretch overflow-hidden rounded-lg bg-brand font-display text-sm font-bold text-white shadow-lg shadow-black/40"
                   role="group"
                   aria-label={`${item.name} quantity`}
                 >
-                  <button type="button" onClick={onRemove} aria-label={`Remove one ${item.name}`} className="flex flex-1 items-center justify-center hover:bg-white/10">
+                  <button
+                    type="button"
+                    onClick={ordering.onRemove}
+                    aria-label={`Remove one ${item.name}`}
+                    className="flex flex-1 items-center justify-center hover:bg-white/10"
+                  >
                     <MinusIcon size={14} />
                   </button>
                   <span className="flex min-w-6 items-center justify-center tabular-nums" aria-live="polite">
-                    {quantityInCart}
+                    {ordering.quantityInCart}
                   </span>
-                  <button type="button" onClick={onAdd} aria-label={`Add one more ${item.name}`} className="flex flex-1 items-center justify-center hover:bg-white/10">
+                  <button
+                    type="button"
+                    onClick={ordering.onAdd}
+                    aria-label={`Add one more ${item.name}`}
+                    className="flex flex-1 items-center justify-center hover:bg-white/10"
+                  >
                     <PlusIcon size={14} />
                   </button>
                 </div>
               ) : (
                 <button
                   type="button"
-                  onClick={onAdd}
+                  onClick={ordering.onAdd}
                   className="relative h-9 w-[104px] rounded-lg border border-zinc-600/70 bg-surface-800 font-display text-sm font-bold tracking-wide text-brand-bright shadow-lg shadow-black/40 transition-colors hover:bg-surface-700 active:scale-[0.98]"
                 >
                   ADD
                   <PlusIcon size={11} className="absolute right-1.5 top-1.5" />
                 </button>
-              )
-            ) : (
-              <span className="flex h-9 w-[104px] items-center justify-center rounded-lg border border-white/10 bg-surface-900 font-display text-xs font-semibold text-zinc-500">
-                Sold out
-              </span>
-            )}
-          </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
-        {item.is_available && <span className="mt-6 text-[11px] leading-none text-zinc-500">customisable</span>}
+        {/* Reserves room for whichever pill overlaps the image, labelled when there's something to say. */}
+        {(ordering !== null || !item.is_available) && (
+          <p className="mt-6 h-3 text-[11px] leading-none text-zinc-500">{ordering && item.is_available ? 'customisable' : ''}</p>
+        )}
       </div>
     </article>
   );
