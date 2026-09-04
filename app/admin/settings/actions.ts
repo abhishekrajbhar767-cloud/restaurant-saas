@@ -65,3 +65,33 @@ export async function clearGeofence(): Promise<{ error: string | null }> {
   revalidatePath('/admin/settings');
   return { error: null };
 }
+
+const ReviewUrlSchema = z
+  .string()
+  .trim()
+  .url('Enter a full link, for example https://g.page/r/…')
+  .startsWith('http', 'The link must start with http:// or https://');
+
+export async function saveGoogleReviewUrl(formData: FormData): Promise<{ error: string | null }> {
+  const restaurantId = await requireTenant();
+
+  // An empty field is how the owner removes the link, so it skips validation.
+  const raw = String(formData.get('googleReviewUrl') ?? '').trim();
+  if (raw !== '') {
+    const parsed = ReviewUrlSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? 'That link is not valid.' };
+    }
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc('set_restaurant_google_review_url', {
+    p_restaurant_id: restaurantId,
+    p_url: raw === '' ? null : raw,
+  });
+
+  if (error) return { error: error.message || 'Could not save the review link.' };
+
+  revalidatePath('/admin/settings');
+  return { error: null };
+}

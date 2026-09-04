@@ -29,6 +29,7 @@ export type Restaurant = {
   latitude: number | null;
   longitude: number | null;
   geofence_radius_meters: number | null;
+  google_review_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -189,6 +190,26 @@ export type StaffShiftHistoryRow = {
   clock_in_longitude: number | null;
 };
 
+export type CustomerRating = {
+  id: string;
+  restaurant_id: string;
+  order_id: string;
+  staff_id: string | null;
+  rating_value: number;
+  created_at: string;
+};
+
+// staff_id is null for the bucket of ratings that could not be attributed to
+// a waiter, so the identity columns are nullable alongside it.
+export type StaffRating = {
+  staff_id: string | null;
+  display_name: string | null;
+  email: string | null;
+  role: MemberRole | null;
+  rating_count: number;
+  average_rating: number;
+};
+
 export type TableTurnaround = {
   completed_sessions: number;
   average_minutes: number | null;
@@ -295,6 +316,7 @@ export type Database = {
       waiter_status: { Row: WaiterStatusRow; Insert: Partial<WaiterStatusRow>; Update: Partial<WaiterStatusRow>; Relationships: [] };
       staff_shifts: { Row: StaffShift; Insert: Partial<StaffShift>; Update: Partial<StaffShift>; Relationships: [] };
       table_sessions: { Row: TableSession; Insert: Partial<TableSession>; Update: Partial<TableSession>; Relationships: [] };
+      customer_ratings: { Row: CustomerRating; Insert: Partial<CustomerRating>; Update: Partial<CustomerRating>; Relationships: [] };
     };
     Functions: {
       create_order: { Args: { p_qr_token: string; p_lines: OrderLineInput[] }; Returns: string };
@@ -341,6 +363,13 @@ export type Database = {
       get_staff_request_timings: {
         Args: { p_restaurant_id: string; p_day?: string | null };
         Returns: StaffRequestTiming[];
+      };
+      submit_customer_rating: { Args: { p_order_id: string; p_rating: number }; Returns: void };
+      get_customer_rating: { Args: { p_order_id: string }; Returns: number | null };
+      set_restaurant_google_review_url: { Args: { p_restaurant_id: string; p_url: string | null }; Returns: void };
+      get_staff_ratings: {
+        Args: { p_restaurant_id: string; p_day?: string | null };
+        Returns: StaffRating[];
       };
     };
     Views: {

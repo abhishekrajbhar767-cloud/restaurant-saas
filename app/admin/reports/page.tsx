@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth/session';
 import { getRestaurantById } from '@/lib/restaurant/queries';
 import {
   getEodSummary,
+  getStaffRatings,
   getStaffRequestTimings,
   getStaffShiftHistory,
   getTableTurnaround,
@@ -27,12 +28,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: { da
   const requested = searchParams.date;
   const day = requested && DAY_PATTERN.test(requested) && requested <= today ? requested : today;
 
-  const [summary, topItems, shifts, turnaround, requestTimings] = await Promise.all([
+  const [summary, topItems, shifts, turnaround, requestTimings, ratings] = await Promise.all([
     getEodSummary(restaurant.id, day),
     getTopSellingItems(restaurant.id, day, 10),
     getStaffShiftHistory(restaurant.id, day),
     getTableTurnaround(restaurant.id, day),
     getStaffRequestTimings(restaurant.id, day),
+    getStaffRatings(restaurant.id, day),
   ]);
 
   const previous = shiftDay(day, -1);
@@ -75,7 +77,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { da
 
       <EodSummaryCards summary={summary} />
 
-      <OperationalTimings turnaround={turnaround} timings={requestTimings} />
+      <OperationalTimings turnaround={turnaround} timings={requestTimings} ratings={ratings} />
 
       <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
         <TopSellingItems items={topItems} />

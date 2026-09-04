@@ -1,6 +1,7 @@
 import { requireRole } from '@/lib/auth/session';
 import { getRestaurantById } from '@/lib/restaurant/queries';
 import { GeofenceSettings } from '@/components/admin/geofence-settings';
+import { GoogleReviewSettings } from '@/components/admin/google-review-settings';
 
 export default async function SettingsPage() {
   const ctx = await requireRole(['owner', 'manager']);
@@ -18,6 +19,7 @@ export default async function SettingsPage() {
       </div>
 
       <GeofenceSettings restaurant={restaurant} />
+      <GoogleReviewSettings restaurant={restaurant} />
     </div>
   );
 }

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ServiceStatusBanner } from '@/components/customer/service-status-banner';
 import { QuickActions } from '@/components/customer/quick-actions';
-import type { Order, OrderItem, OrderStatus } from '@/types/database';
+import { FeedbackPanel } from '@/components/customer/feedback-panel';
+import type { Order, OrderItem, OrderStatus, RestaurantTable, TableStatus } from '@/types/database';
 
 const STEPS: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready', 'served'];
 const STEP_LABEL: Record<OrderStatus, string> = {
@@ -27,6 +28,9 @@ export function OrderTracker({
   tableId,
   restaurantSlug,
   tableQrToken,
+  initialTableStatus,
+  initialRating,
+  googleReviewUrl,
 }: {
   initialOrder: Order;
   orderItems: OrderItem[];
@@ -36,8 +40,12 @@ export function OrderTracker({
   tableId: string;
   restaurantSlug: string;
   tableQrToken?: string;
+  initialTableStatus: TableStatus;
+  initialRating: number | null;
+  googleReviewUrl: string | null;
 }) {
   const [order, setOrder] = useState(initialOrder);
+  const [tableStatus, setTableStatus] = useState(initialTableStatus);
   const [now, setNow] = useState(() => Date.now());
 
   // Realtime — the ONLY source of status updates. No polling, no timers
@@ -57,6 +65,22 @@ export function OrderTracker({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- subscribe once per order id
   }, [order.id]);
 
+  // The bill being presented is tracked on the table, not the order — that is
+  // what the manager flips on the live map — so feedback waits on this.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`order-table-${tableId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` }, (payload) => {
+        setTableStatus((payload.new as RestaurantTable).status);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tableId]);
+
   // A 1s tick purely to re-render the countdown display — this does not
   // simulate or infer status; it only reformats a real timestamp already
   // pushed by realtime (accepted_at + estimated_minutes).
@@ -73,6 +97,10 @@ export function OrderTracker({
   const itemsTotal = activeItems.reduce((sum, i) => sum + Math.max(i.unit_price * i.quantity - Number(i.discount_amount), 0), 0);
   const total = Math.max(itemsTotal - Number(order.discount_amount), 0);
   const closed = order.status === 'cancelled' || order.status === 'voided';
+  // order_status has no 'billed' member — the bill lives on the table. The
+  // 'served' fallback keeps feedback working for restaurants that never
+  // touch the table map.
+  const mealOver = !closed && (tableStatus === 'billed' || order.status === 'served');
 
   return (
     <div className="min-h-screen bg-paper text-text-onPaper">
@@ -153,6 +181,10 @@ export function OrderTracker({
           </span>
         </div>
       </div>
+
+      {mealOver && (
+        <FeedbackPanel orderId={order.id} initialRating={initialRating} googleReviewUrl={googleReviewUrl} />
+      )}
       </div>
 
       {tableQrToken && <QuickActions tableId={tableId} tableQrToken={tableQrToken} />}

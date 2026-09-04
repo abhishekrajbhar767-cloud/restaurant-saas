@@ -7,6 +7,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type {
   EodSummary,
+  StaffRating,
   StaffRequestTiming,
   StaffShiftHistoryRow,
   TableTurnaround,
@@ -109,6 +110,20 @@ export async function getStaffRequestTimings(
   if (error) {
     console.error('get_staff_request_timings failed', error);
     throw new Error('Could not load request completion times.');
+  }
+  return data ?? [];
+}
+
+export async function getStaffRatings(restaurantId: string, day: string | null): Promise<StaffRating[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('get_staff_ratings', {
+    p_restaurant_id: restaurantId,
+    p_day: day,
+  });
+
+  if (error) {
+    console.error('get_staff_ratings failed', error);
+    throw new Error('Could not load customer ratings.');
   }
   return data ?? [];
 }
