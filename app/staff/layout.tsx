@@ -1,10 +1,12 @@
-import { requireRole } from '@/lib/auth/session';
+import { homeRouteFor, requireRole } from '@/lib/auth/session';
 import { StaffTopbar } from '@/components/shared/staff-topbar';
 import { SuspendedBanner } from '@/components/shared/suspended-banner';
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireRole(['owner', 'manager', 'kitchen', 'waiter']);
   const restaurant = ctx.tenantMembership?.restaurant;
+  // Back goes wherever this role actually works: /kitchen, /waiter or /admin.
+  const backHref = homeRouteFor(ctx);
 
   if (!restaurant) {
     return (
@@ -19,7 +21,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen">
-      <StaffTopbar area="Shift" restaurantName={restaurant.name} />
+      <StaffTopbar area="Shift" restaurantName={restaurant.name} backHref={backHref} showShiftLink={false} />
       {restaurant.status === 'suspended' && <SuspendedBanner />}
       <main className="p-4 sm:p-6">{children}</main>
     </div>

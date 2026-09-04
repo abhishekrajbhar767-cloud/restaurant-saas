@@ -144,6 +144,39 @@ export type StaffShift = {
   clock_in_longitude: number | null;
 };
 
+export type EodSummary = {
+  order_count: number;
+  items_sold: number;
+  gross_revenue: number;
+  discount_total: number;
+  net_revenue: number;
+  average_order_value: number | null;
+  voided_order_count: number;
+  voided_item_count: number;
+  voided_value: number;
+};
+
+export type TopSellingItem = {
+  item_name: string;
+  quantity_sold: number;
+  order_count: number;
+  net_revenue: number;
+};
+
+export type StaffShiftHistoryRow = {
+  shift_id: string;
+  staff_id: string;
+  display_name: string | null;
+  email: string;
+  role: MemberRole;
+  clock_in_time: string;
+  clock_out_time: string | null;
+  minutes_worked: number;
+  is_open: boolean;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+};
+
 export type ActiveShiftRow = {
   shift_id: string;
   staff_id: string;
@@ -262,6 +295,15 @@ export type Database = {
       clock_in: { Args: { p_restaurant_id: string; p_latitude?: number | null; p_longitude?: number | null }; Returns: string };
       clock_out: { Args: { p_shift_id?: string | null }; Returns: void };
       get_active_shifts: { Args: { p_restaurant_id: string }; Returns: ActiveShiftRow[] };
+      get_eod_summary: { Args: { p_restaurant_id: string; p_day?: string | null }; Returns: EodSummary };
+      get_top_selling_items: {
+        Args: { p_restaurant_id: string; p_day?: string | null; p_limit?: number };
+        Returns: TopSellingItem[];
+      };
+      get_staff_shift_history: {
+        Args: { p_restaurant_id: string; p_day?: string | null };
+        Returns: StaffShiftHistoryRow[];
+      };
     };
     Views: {
       [_ in never]: never;
