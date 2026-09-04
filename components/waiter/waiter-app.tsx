@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
 import { NewOrderSheet } from '@/components/waiter/new-order-sheet';
+import { TableStatusBoard } from '@/components/waiter/table-status-board';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
+import { setTableStatus } from '@/lib/shared/table-status';
 import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
 import type {
   MenuCategory,
@@ -12,6 +14,7 @@ import type {
   RestaurantTable,
   ServiceRequestWithTable,
   ServiceRequest,
+  TableStatus,
   WaiterStatusRow,
   WaiterAvailability,
 } from '@/types/database';
@@ -24,7 +27,7 @@ export function WaiterApp({
   memberId,
   initialAvailability,
   initialRequests,
-  tables,
+  initialTables,
   categories,
   menuItems,
   currency,
@@ -35,7 +38,7 @@ export function WaiterApp({
   memberId: string;
   initialAvailability: WaiterAvailability;
   initialRequests: ServiceRequestWithTable[];
-  tables: RestaurantTable[];
+  initialTables: RestaurantTable[];
   categories: MenuCategory[];
   menuItems: MenuItem[];
   currency: string;
@@ -44,13 +47,22 @@ export function WaiterApp({
 }) {
   const [availability, setAvailability] = useState<WaiterAvailability>(initialAvailability);
   const [requests, setRequests] = useState<ServiceRequestWithTable[]>(initialRequests);
+  const [tables, setTables] = useState<RestaurantTable[]>(initialTables);
+  const [pendingTableIds, setPendingTableIds] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  // Seeded on mount rather than at render so the server pass and the first
+  // client pass agree — Date.now() during SSR would hydrate mismatched.
+  const [nowMs, setNowMs] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const vibrateTimerRef = useRef<number | null>(null);
   const shouldRingRef = useRef(false);
+  // Guards a second tap landing while the first write is still in flight —
+  // without it the rollback path can restore a status the waiter has already
+  // moved on from.
+  const tablesInFlightRef = useRef<Set<string>>(new Set());
 
   function stopVibrationNow() {
     if (vibrateTimerRef.current !== null) {
@@ -118,6 +130,24 @@ export function WaiterApp({
           setAvailability((payload.new as WaiterStatusRow).availability);
         }
       )
+      // Any device can seat or clear a table — the manager's live map, another
+      // waiter's phone, or create_order seating a table implicitly — so the
+      // board follows the row rather than only its own taps.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${restaurantId}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const removed = payload.old as Partial<RestaurantTable>;
+            setTables((prev) => prev.filter((t) => t.id !== removed.id));
+            return;
+          }
+          const table = payload.new as RestaurantTable;
+          setTables((prev) =>
+            prev.some((t) => t.id === table.id) ? prev.map((t) => (t.id === table.id ? { ...t, ...table } : t)) : [...prev, table]
+          );
+        }
+      )
       .subscribe();
 
     return () => {
@@ -130,6 +160,25 @@ export function WaiterApp({
     const id = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // The seated timers are rendered in whole minutes, so a 15s tick keeps them
+  // within a quarter-minute of the truth without re-rendering constantly.
+  useEffect(() => {
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // getRestaurantTables orders by table_number as text, which puts 10 before
+  // 2. Inactive tables are filtered here rather than on the server so a table
+  // being retired mid-shift leaves the board over realtime.
+  const activeTables = useMemo(
+    () =>
+      tables
+        .filter((table) => table.is_active)
+        .sort((a, b) => a.table_number.localeCompare(b.table_number, undefined, { numeric: true })),
+    [tables]
+  );
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
 
@@ -207,6 +256,38 @@ export function WaiterApp({
     }
   }
 
+  // Optimistic so the tap feels instant on a phone; the realtime UPDATE that
+  // follows is what everyone else's board reacts to, and a rejected write is
+  // rolled back rather than left showing a status the database never took.
+  async function handleSetTableStatus(tableId: string, status: TableStatus) {
+    const current = tables.find((t) => t.id === tableId);
+    if (!current || current.status === status || tablesInFlightRef.current.has(tableId)) return;
+
+    tablesInFlightRef.current.add(tableId);
+    setPendingTableIds((prev) => new Set(prev).add(tableId));
+    setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status } : t)));
+
+    const { error } = await setTableStatus(tableId, status);
+
+    tablesInFlightRef.current.delete(tableId);
+    setPendingTableIds((prev) => {
+      const next = new Set(prev);
+      next.delete(tableId);
+      return next;
+    });
+
+    if (error) {
+      setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: current.status } : t)));
+      setToast(`Couldn't update Table ${current.table_number} — try again.`);
+      return;
+    }
+    setToast(
+      status === 'empty'
+        ? `Table ${current.table_number} is free`
+        : `Table ${current.table_number} is seated`
+    );
+  }
+
   async function handleAccept(requestId: string) {
     const supabase = createClient();
     const { data: claimed, error } = await supabase.rpc('claim_service_request', { p_request_id: requestId });
@@ -273,7 +354,7 @@ export function WaiterApp({
 
       {orderSheetOpen && (
         <NewOrderSheet
-          tables={tables}
+          tables={activeTables}
           categories={categories}
           items={menuItems}
           currency={currency}
@@ -316,6 +397,15 @@ export function WaiterApp({
           </div>
         </section>
       )}
+
+      {/* Below the queue on purpose: seating and clearing happens when guests
+          arrive or leave, while a waiting request is ringing right now. */}
+      <TableStatusBoard
+        tables={activeTables}
+        pendingIds={pendingTableIds}
+        nowMs={nowMs}
+        onSetStatus={handleSetTableStatus}
+      />
     </div>
   );
 }

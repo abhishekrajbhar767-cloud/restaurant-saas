@@ -349,6 +349,7 @@ export type Database = {
       claim_service_request: { Args: { p_request_id: string }; Returns: boolean };
       resolve_service_request: { Args: { p_request_id: string }; Returns: void };
       set_waiter_availability: { Args: { p_restaurant_id: string; p_availability: WaiterAvailability }; Returns: void };
+      set_table_status: { Args: { p_table_id: string; p_status: TableStatus }; Returns: void };
       auth_is_super_admin: { Args: Record<string, never>; Returns: boolean };
       get_platform_stats: { Args: Record<string, never>; Returns: PlatformStats };
       get_restaurant_overview: { Args: Record<string, never>; Returns: RestaurantOverviewRow[] };

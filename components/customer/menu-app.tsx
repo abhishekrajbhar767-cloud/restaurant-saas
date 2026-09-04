@@ -7,7 +7,8 @@ import { QuickActions } from '@/components/customer/quick-actions';
 import { ActiveOrders } from '@/components/customer/active-orders';
 import { ServiceStatusBanner } from '@/components/customer/service-status-banner';
 import { loadCart, saveCart, cartTotal, cartCount, type CartLine } from '@/lib/customer/cart';
-import type { Restaurant, RestaurantTable, MenuCategory, MenuItem } from '@/types/database';
+import { createClient } from '@/lib/supabase/client';
+import type { Restaurant, RestaurantTable, MenuCategory, MenuItem, TableStatus } from '@/types/database';
 
 export function MenuApp({
   restaurant,
@@ -24,9 +25,32 @@ export function MenuApp({
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id ?? '');
   const [cartOpen, setCartOpen] = useState(false);
+  const [tableStatus, setTableStatus] = useState<TableStatus>(table.status);
 
   useEffect(() => {
     setCart(loadCart(table.id));
+  }, [table.id]);
+
+  // A waiter seating or clearing this table is what unlocks or re-locks
+  // ordering at restaurants that only accept orders from seated tables, and
+  // the guest is holding a page that was rendered before either happened.
+  // tables is already in the realtime publication for the manager's map, and
+  // tables_select_public is what lets an anonymous guest receive their own
+  // table's row.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`menu-table-${table.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${table.id}` },
+        (payload) => setTableStatus((payload.new as RestaurantTable).status)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [table.id]);
 
   useEffect(() => {
@@ -183,7 +207,7 @@ export function MenuApp({
         currency={restaurant.currency}
         askName={restaurant.enable_customer_name}
         askMobile={restaurant.enable_customer_mobile}
-        needsSeating={restaurant.require_table_assignment && table.status === 'empty'}
+        needsSeating={restaurant.require_table_assignment && tableStatus === 'empty'}
       />
     </div>
   );

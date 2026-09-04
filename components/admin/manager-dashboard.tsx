@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { setMenuItemAvailability, setTableStatus } from '@/lib/manager/actions';
+import { setMenuItemAvailability } from '@/lib/manager/actions';
+import { setTableStatus } from '@/lib/shared/table-status';
 import { AttendancePanel } from '@/components/admin/attendance-panel';
 import { MenuQuickActions } from '@/components/admin/menu-quick-actions';
 import { OrderFinancials } from '@/components/admin/order-financials';

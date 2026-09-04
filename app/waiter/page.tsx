@@ -34,9 +34,11 @@ export default async function WaiterPage() {
       memberId={memberId}
       initialAvailability={myStatus?.availability ?? 'offline'}
       initialRequests={initialRequests}
-      // 86'd items are filtered out here too — create_order rejects them
-      // anyway, and a waiter should not be able to tap one at the table.
-      tables={tables.filter((t) => t.is_active)}
+      // Inactive tables are dropped client-side instead, so the table board
+      // can react to one being retired mid-shift over realtime.
+      initialTables={tables}
+      // 86'd items are filtered out here — create_order rejects them anyway,
+      // and a waiter should not be able to tap one at the table.
       categories={categories.filter((c) => c.is_active)}
       menuItems={menuItems.filter((i) => i.is_available)}
       currency={restaurant.currency}
