@@ -15,6 +15,7 @@ const STEP_LABEL: Record<OrderStatus, string> = {
   ready: 'Ready',
   served: 'Served',
   cancelled: 'Cancelled',
+  voided: 'Voided',
 };
 
 export function OrderTracker({
@@ -66,7 +67,12 @@ export function OrderTracker({
 
   const countdown = getCountdown(order, now);
   const currentStepIndex = STEPS.indexOf(order.status);
-  const total = orderItems.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
+  // Voided lines and manager discounts have to be reflected here — this is the
+  // bill the customer is looking at while the manager edits it.
+  const activeItems = orderItems.filter((i) => i.status !== 'voided');
+  const itemsTotal = activeItems.reduce((sum, i) => sum + Math.max(i.unit_price * i.quantity - Number(i.discount_amount), 0), 0);
+  const total = Math.max(itemsTotal - Number(order.discount_amount), 0);
+  const closed = order.status === 'cancelled' || order.status === 'voided';
 
   return (
     <div className="min-h-screen bg-paper text-text-onPaper">
@@ -84,10 +90,14 @@ export function OrderTracker({
         Table {tableNumber} · Order #{order.order_number}
       </p>
 
-      {order.status === 'cancelled' ? (
+      {closed ? (
         <div className="rounded-lg border border-danger/30 bg-danger/5 p-5">
-          <p className="font-display font-bold text-danger mb-1">Order cancelled</p>
-          {order.cancellation_reason && <p className="text-sm text-text-onPaper/70">{order.cancellation_reason}</p>}
+          <p className="font-display font-bold text-danger mb-1">
+            {order.status === 'voided' ? 'Order voided' : 'Order cancelled'}
+          </p>
+          {(order.void_reason || order.cancellation_reason) && (
+            <p className="text-sm text-text-onPaper/70">{order.void_reason ?? order.cancellation_reason}</p>
+          )}
         </div>
       ) : (
         <ol className="space-y-0 mb-6" aria-label="Order status">
@@ -112,16 +122,29 @@ export function OrderTracker({
       <div className="rounded-lg border border-ink-950/10 p-4">
         <h2 className="font-display font-bold text-sm uppercase tracking-wide text-text-onPaper/50 mb-3">Your order</h2>
         <div className="space-y-2">
-          {orderItems.map((item) => (
+          {activeItems.map((item) => (
             <div key={item.id} className="flex justify-between text-sm">
               <span>
                 {item.quantity}× {item.item_name}
+                {Number(item.discount_amount) > 0 && (
+                  <span className="ml-1 text-xs text-text-onPaper/50">
+                    (−{currency} {Number(item.discount_amount).toLocaleString('en-IN')})
+                  </span>
+                )}
               </span>
               <span className="font-mono">
-                {currency} {(item.unit_price * item.quantity).toLocaleString('en-IN')}
+                {currency} {Math.max(item.unit_price * item.quantity - Number(item.discount_amount), 0).toLocaleString('en-IN')}
               </span>
             </div>
           ))}
+          {Number(order.discount_amount) > 0 && (
+            <div className="flex justify-between text-sm text-text-onPaper/60">
+              <span>Discount</span>
+              <span className="font-mono">
+                − {currency} {Number(order.discount_amount).toLocaleString('en-IN')}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex justify-between font-display font-bold mt-3 pt-3 border-t border-ink-950/10">
           <span>Total</span>

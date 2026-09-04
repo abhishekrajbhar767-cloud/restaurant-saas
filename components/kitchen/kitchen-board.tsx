@@ -79,6 +79,12 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
         (payload) => {
           const updated = payload.new as Order;
+          // A manager voiding a ticket (or another device serving/cancelling
+          // it) has to pull it off this board, not just restyle it.
+          if (updated.status === 'voided' || updated.status === 'cancelled' || updated.status === 'served') {
+            setOrders((prev) => prev.filter((o) => o.id !== updated.id));
+            return;
+          }
           setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
         }
       )

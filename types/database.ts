@@ -11,7 +11,8 @@
 export type RestaurantStatus = 'active' | 'suspended' | 'archived';
 export type MemberRole = 'super_admin' | 'owner' | 'manager' | 'kitchen' | 'waiter';
 export type FoodType = 'veg' | 'non_veg' | 'egg' | 'vegan';
-export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'served' | 'cancelled';
+export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'served' | 'cancelled' | 'voided';
+export type OrderItemStatus = 'active' | 'voided';
 export type ServiceRequestType = 'waiter' | 'water' | 'bill';
 export type ServiceRequestStatus = 'pending' | 'claimed' | 'resolved' | 'cancelled';
 export type WaiterAvailability = 'free' | 'busy' | 'offline';
@@ -84,6 +85,8 @@ export type Order = {
   order_number: number;
   status: OrderStatus;
   subtotal: number;
+  discount_amount: number;
+  void_reason: string | null;
   estimated_minutes: number | null;
   cancellation_reason: string | null;
   created_at: string;
@@ -102,6 +105,9 @@ export type OrderItem = {
   unit_price: number;
   quantity: number;
   special_instructions: string | null;
+  discount_amount: number;
+  void_reason: string | null;
+  status: OrderItemStatus;
   created_at: string;
 };
 
@@ -213,6 +219,10 @@ export type Database = {
       get_restaurant_overview: { Args: Record<string, never>; Returns: RestaurantOverviewRow[] };
       get_restaurant_staff: { Args: { p_restaurant_id: string }; Returns: RestaurantStaffRow[] };
       get_restaurant_stats: { Args: { p_restaurant_id: string }; Returns: RestaurantStats };
+      void_order: { Args: { p_order_id: string; p_reason: string }; Returns: void };
+      void_order_item: { Args: { p_item_id: string; p_reason: string }; Returns: void };
+      apply_order_discount: { Args: { p_order_id: string; p_amount: number }; Returns: void };
+      apply_order_item_discount: { Args: { p_item_id: string; p_amount: number }; Returns: void };
     };
     Views: {
       [_ in never]: never;
@@ -226,6 +236,7 @@ export type Database = {
       service_request_status: ServiceRequestStatus;
       waiter_availability: WaiterAvailability;
       table_status: TableStatus;
+      order_item_status: OrderItemStatus;
     };
     CompositeTypes: {
       [_ in never]: never;

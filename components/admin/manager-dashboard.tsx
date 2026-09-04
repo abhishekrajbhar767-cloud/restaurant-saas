@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { setMenuItemAvailability, setTableStatus } from '@/lib/manager/actions';
 import { MenuQuickActions } from '@/components/admin/menu-quick-actions';
+import { OrderFinancials } from '@/components/admin/order-financials';
 import { EMPTY_SIGNALS, TableMap, toneFor, type TableSignals, type TableTone } from '@/components/admin/table-map';
 import type {
   MenuCategory,
@@ -38,6 +39,9 @@ export function ManagerDashboard({
   const [requests, setRequests] = useState(initialRequests);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped whenever an order row changes so the financial panel refetches —
+  // it needs order_items too, which the realtime payload doesn't carry.
+  const [orderVersion, setOrderVersion] = useState(0);
   const [pendingTableIds, setPendingTableIds] = useState<ReadonlySet<string>>(new Set());
   const [pendingItemIds, setPendingItemIds] = useState<ReadonlySet<string>>(new Set());
 
@@ -78,6 +82,7 @@ export function ManagerDashboard({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
         (payload) => {
+          setOrderVersion((v) => v + 1);
           if (payload.eventType === 'DELETE') {
             const removed = payload.old as Partial<Order>;
             setOrders((prev) => prev.filter((o) => o.id !== removed.id));
@@ -231,6 +236,8 @@ export function ManagerDashboard({
           onToggle={handleToggleItem}
         />
       </div>
+
+      <OrderFinancials restaurantId={restaurantId} tables={tables} refreshToken={orderVersion} />
     </div>
   );
 }

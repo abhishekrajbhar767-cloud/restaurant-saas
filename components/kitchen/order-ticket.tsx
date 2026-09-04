@@ -37,12 +37,20 @@ export function OrderTicket({
       </div>
 
       <ul className="text-sm space-y-1">
-        {order.items.map((item) => (
-          <li key={item.id}>
-            <span className="font-mono text-amber">{item.quantity}×</span> {item.item_name}
-            {item.special_instructions && <div className="text-xs text-text-muted pl-5 italic">&ldquo;{item.special_instructions}&rdquo;</div>}
-          </li>
-        ))}
+        {order.items.map((item) => {
+          const voided = item.status === 'voided';
+          return (
+            <li key={item.id} className={voided ? 'opacity-50' : ''}>
+              <span className={voided ? 'line-through' : ''}>
+                <span className="font-mono text-amber">{item.quantity}×</span> {item.item_name}
+              </span>
+              {voided && <span className="ml-1.5 text-xs uppercase tracking-wide text-danger">Voided</span>}
+              {!voided && item.special_instructions && (
+                <div className="text-xs text-text-muted pl-5 italic">&ldquo;{item.special_instructions}&rdquo;</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="mt-auto pt-2 border-t border-line flex flex-col gap-2">
