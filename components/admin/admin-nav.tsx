@@ -9,6 +9,7 @@ const TABS = [
   { href: '/admin/menu', label: 'Menu' },
   { href: '/admin/tables', label: 'Tables' },
   { href: '/admin/staff', label: 'Staff' },
+  { href: '/admin/settings', label: 'Settings' },
 ];
 
 // canManage is a display decision only. /admin/manager re-derives the role

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { signOut } from '@/app/auth/login/actions';
 import { PublicPageActions } from '@/components/shared/public-page-actions';
 
@@ -27,6 +28,12 @@ export function StaffTopbar({
         </div>
         <div className="flex items-center gap-4 shrink-0">
           {restaurantSlug && <PublicPageActions restaurantSlug={restaurantSlug} />}
+          {/* Only tenant staff have a shift; a super admin has no membership to clock. */}
+          {restaurantName && (
+            <Link href="/staff" className="text-xs text-text-muted hover:text-text underline underline-offset-2">
+              My Shift
+            </Link>
+          )}
           <form action={signOut}>
             <button type="submit" className="text-xs text-text-muted hover:text-text underline underline-offset-2">
               Sign out

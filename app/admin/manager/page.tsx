@@ -1,12 +1,14 @@
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { getMenuCategories, getMenuItems, getRestaurantTables } from '@/lib/restaurant/queries';
+import { getMenuCategories, getMenuItems, getRestaurantById, getRestaurantTables } from '@/lib/restaurant/queries';
 import { ManagerDashboard } from '@/components/admin/manager-dashboard';
 import type { Order, ServiceRequest } from '@/types/database';
 
 export default async function ManagerPage() {
   const ctx = await requireRole(['owner', 'manager']);
-  const restaurant = ctx.tenantMembership!.restaurant;
+  const membership = ctx.tenantMembership!;
+  // Re-read so the attendance panel sees geofence edits made elsewhere.
+  const restaurant = (await getRestaurantById(membership.restaurant.id)) ?? membership.restaurant;
   const supabase = createClient();
 
   // Only the live slice of orders/requests is needed — the map colours a table
@@ -37,7 +39,7 @@ export default async function ManagerPage() {
       </div>
 
       <ManagerDashboard
-        restaurantId={restaurant.id}
+        restaurant={restaurant}
         initialTables={tables}
         initialCategories={categories}
         initialItems={items}

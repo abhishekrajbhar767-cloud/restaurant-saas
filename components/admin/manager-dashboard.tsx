@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { setMenuItemAvailability, setTableStatus } from '@/lib/manager/actions';
+import { AttendancePanel } from '@/components/admin/attendance-panel';
 import { MenuQuickActions } from '@/components/admin/menu-quick-actions';
 import { OrderFinancials } from '@/components/admin/order-financials';
 import { EMPTY_SIGNALS, TableMap, toneFor, type TableSignals, type TableTone } from '@/components/admin/table-map';
@@ -10,6 +11,7 @@ import type {
   MenuCategory,
   MenuItem,
   Order,
+  Restaurant,
   RestaurantTable,
   ServiceRequest,
   TableStatus,
@@ -19,20 +21,21 @@ const LIVE_ORDER_STATUSES: Order['status'][] = ['placed', 'accepted', 'preparing
 const OPEN_REQUEST_STATUSES: ServiceRequest['status'][] = ['pending', 'claimed'];
 
 export function ManagerDashboard({
-  restaurantId,
+  restaurant,
   initialTables,
   initialCategories,
   initialItems,
   initialOrders,
   initialRequests,
 }: {
-  restaurantId: string;
+  restaurant: Restaurant;
   initialTables: RestaurantTable[];
   initialCategories: MenuCategory[];
   initialItems: MenuItem[];
   initialOrders: Order[];
   initialRequests: ServiceRequest[];
 }) {
+  const restaurantId = restaurant.id;
   const [tables, setTables] = useState(initialTables);
   const [items, setItems] = useState(initialItems);
   const [orders, setOrders] = useState(initialOrders);
@@ -237,7 +240,10 @@ export function ManagerDashboard({
         />
       </div>
 
-      <OrderFinancials restaurantId={restaurantId} tables={tables} refreshToken={orderVersion} />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <OrderFinancials restaurantId={restaurantId} tables={tables} refreshToken={orderVersion} />
+        <AttendancePanel restaurant={restaurant} />
+      </div>
     </div>
   );
 }

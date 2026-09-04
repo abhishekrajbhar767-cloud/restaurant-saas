@@ -26,6 +26,9 @@ export type Restaurant = {
   currency: string;
   timezone: string;
   status: RestaurantStatus;
+  latitude: number | null;
+  longitude: number | null;
+  geofence_radius_meters: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -130,6 +133,29 @@ export type WaiterStatusRow = {
   updated_at: string;
 };
 
+export type StaffShift = {
+  id: string;
+  restaurant_id: string;
+  staff_id: string;
+  clock_in_time: string;
+  clock_out_time: string | null;
+  total_offline_minutes: number;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+};
+
+export type ActiveShiftRow = {
+  shift_id: string;
+  staff_id: string;
+  display_name: string | null;
+  email: string;
+  role: MemberRole;
+  clock_in_time: string;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  total_offline_minutes: number;
+};
+
 export type OrderLineInput = {
   menu_item_id: string;
   quantity: number;
@@ -205,6 +231,7 @@ export type Database = {
       order_items: { Row: OrderItem; Insert: Partial<OrderItem>; Update: Partial<OrderItem>; Relationships: [] };
       service_requests: { Row: ServiceRequest; Insert: Partial<ServiceRequest>; Update: Partial<ServiceRequest>; Relationships: [] };
       waiter_status: { Row: WaiterStatusRow; Insert: Partial<WaiterStatusRow>; Update: Partial<WaiterStatusRow>; Relationships: [] };
+      staff_shifts: { Row: StaffShift; Insert: Partial<StaffShift>; Update: Partial<StaffShift>; Relationships: [] };
     };
     Functions: {
       create_order: { Args: { p_qr_token: string; p_lines: OrderLineInput[] }; Returns: string };
@@ -223,6 +250,18 @@ export type Database = {
       void_order_item: { Args: { p_item_id: string; p_reason: string }; Returns: void };
       apply_order_discount: { Args: { p_order_id: string; p_amount: number }; Returns: void };
       apply_order_item_discount: { Args: { p_item_id: string; p_amount: number }; Returns: void };
+      set_restaurant_geofence: {
+        Args: {
+          p_restaurant_id: string;
+          p_latitude: number | null;
+          p_longitude: number | null;
+          p_radius_meters: number | null;
+        };
+        Returns: void;
+      };
+      clock_in: { Args: { p_restaurant_id: string; p_latitude?: number | null; p_longitude?: number | null }; Returns: string };
+      clock_out: { Args: { p_shift_id?: string | null }; Returns: void };
+      get_active_shifts: { Args: { p_restaurant_id: string }; Returns: ActiveShiftRow[] };
     };
     Views: {
       [_ in never]: never;
