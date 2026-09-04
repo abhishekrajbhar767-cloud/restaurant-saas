@@ -217,11 +217,14 @@ export type TableTurnaround = {
   open_sessions: number;
 };
 
+// One row per staff member per request type — fetching water and settling a
+// bill are different jobs and a single blended average hides that.
 export type StaffRequestTiming = {
   staff_id: string;
   display_name: string | null;
   email: string;
   role: MemberRole;
+  request_type: ServiceRequestType;
   requests_completed: number;
   average_minutes: number | null;
   longest_minutes: number;

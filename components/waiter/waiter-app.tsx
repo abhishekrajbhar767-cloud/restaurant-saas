@@ -3,9 +3,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
+import { NewOrderSheet } from '@/components/waiter/new-order-sheet';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
 import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
-import type { ServiceRequestWithTable, ServiceRequest, WaiterStatusRow, WaiterAvailability } from '@/types/database';
+import type {
+  MenuCategory,
+  MenuItem,
+  RestaurantTable,
+  ServiceRequestWithTable,
+  ServiceRequest,
+  WaiterStatusRow,
+  WaiterAvailability,
+} from '@/types/database';
 
 // 1s buzz, 0.5s rest, twice — refired every 3s by the interval below.
 const VIBRATE_PATTERN: number[] = [1000, 500, 1000, 500];
@@ -15,16 +24,25 @@ export function WaiterApp({
   memberId,
   initialAvailability,
   initialRequests,
+  tables,
+  categories,
+  menuItems,
+  currency,
 }: {
   restaurantId: string;
   memberId: string;
   initialAvailability: WaiterAvailability;
   initialRequests: ServiceRequestWithTable[];
+  tables: RestaurantTable[];
+  categories: MenuCategory[];
+  menuItems: MenuItem[];
+  currency: string;
 }) {
   const [availability, setAvailability] = useState<WaiterAvailability>(initialAvailability);
   const [requests, setRequests] = useState<ServiceRequestWithTable[]>(initialRequests);
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const vibrateTimerRef = useRef<number | null>(null);
@@ -241,6 +259,27 @@ export function WaiterApp({
       >
         {availability === 'free' ? 'FREE' : availability === 'busy' ? 'BUSY' : 'OFFLINE — tap to go Free'}
       </button>
+
+      <button
+        onClick={() => setOrderSheetOpen(true)}
+        className="w-full rounded-lg border border-amber/40 bg-amber/10 py-3 font-display font-bold text-amber"
+      >
+        + New Order for Table
+      </button>
+
+      {orderSheetOpen && (
+        <NewOrderSheet
+          tables={tables}
+          categories={categories}
+          items={menuItems}
+          currency={currency}
+          onClose={() => setOrderSheetOpen(false)}
+          onPlaced={(message) => {
+            setOrderSheetOpen(false);
+            setToast(message);
+          }}
+        />
+      )}
 
       <section>
         <h2 className="font-display font-bold text-sm uppercase tracking-wide text-text-muted mb-2">

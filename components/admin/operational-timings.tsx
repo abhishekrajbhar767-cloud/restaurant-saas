@@ -1,6 +1,22 @@
 import { ROLE_LABEL } from '@/lib/auth/roles';
 import { formatMinutes } from '@/lib/shared/duration';
-import type { MemberRole, StaffRating, StaffRequestTiming, TableTurnaround } from '@/types/database';
+import type {
+  MemberRole,
+  ServiceRequestType,
+  StaffRating,
+  StaffRequestTiming,
+  TableTurnaround,
+} from '@/types/database';
+
+const REQUEST_TYPE_LABEL: Record<ServiceRequestType, string> = {
+  waiter: 'Waiter',
+  water: 'Water',
+  bill: 'Bill',
+};
+
+const REQUEST_TYPE_ORDER: ServiceRequestType[] = ['waiter', 'water', 'bill'];
+
+type TypeStat = { count: number; averageMinutes: number | null; longestMinutes: number };
 
 type StaffRow = {
   staffId: string;
@@ -9,6 +25,7 @@ type StaffRow = {
   requestsCompleted: number;
   averageMinutes: number | null;
   longestMinutes: number;
+  byType: Partial<Record<ServiceRequestType, TypeStat>>;
   ratingCount: number;
   averageRating: number | null;
 };
@@ -83,28 +100,57 @@ export function OperationalTimings({
       ) : (
         <ul className="mt-3 space-y-2">
           {staff.map((row) => (
-            <li
-              key={row.staffId}
-              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded border border-line bg-ink-800/40 px-3 py-2"
-            >
-              <div className="min-w-0">
-                <span className="text-sm font-medium">{row.name}</span>
-                {row.role && (
-                  <span className="ml-2 text-[11px] uppercase tracking-wide text-text-muted">{ROLE_LABEL[row.role]}</span>
-                )}
+            <li key={row.staffId} className="rounded border border-line bg-ink-800/40 px-3 py-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium">{row.name}</span>
+                  {row.role && (
+                    <span className="ml-2 text-[11px] uppercase tracking-wide text-text-muted">
+                      {ROLE_LABEL[row.role]}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline gap-4 font-mono text-xs">
+                  <span className="text-text-muted">
+                    {row.requestsCompleted} {row.requestsCompleted === 1 ? 'request' : 'requests'}
+                  </span>
+                  <span className="text-text-muted">worst {formatMinutes(row.longestMinutes)}</span>
+                  <span className="text-sm">
+                    {row.averageMinutes === null ? '—' : formatMinutes(row.averageMinutes)}
+                  </span>
+                  <span className="w-20 text-right text-sm text-amber">
+                    {row.averageRating === null ? '—' : `${row.averageRating.toFixed(1)} ★ (${row.ratingCount})`}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-baseline gap-4 font-mono text-xs">
-                <span className="text-text-muted">
-                  {row.requestsCompleted} {row.requestsCompleted === 1 ? 'request' : 'requests'}
-                </span>
-                <span className="text-text-muted">worst {formatMinutes(row.longestMinutes)}</span>
-                <span className="text-sm">
-                  {row.averageMinutes === null ? '—' : formatMinutes(row.averageMinutes)}
-                </span>
-                <span className="w-20 text-right text-sm text-amber">
-                  {row.averageRating === null ? '—' : `${row.averageRating.toFixed(1)} ★ (${row.ratingCount})`}
-                </span>
-              </div>
+
+              {row.requestsCompleted > 0 && (
+                <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                  {REQUEST_TYPE_ORDER.map((type) => {
+                    const stat = row.byType[type];
+                    return (
+                      <li
+                        key={type}
+                        className={`rounded-full px-2 py-0.5 font-mono text-[11px] ${
+                          stat ? 'bg-ink-950/50 text-text-muted' : 'bg-ink-950/20 text-text-muted/40'
+                        }`}
+                      >
+                        {REQUEST_TYPE_LABEL[type]}{' '}
+                        {stat ? (
+                          <>
+                            <span className="text-text">
+                              {stat.averageMinutes === null ? '—' : formatMinutes(stat.averageMinutes)}
+                            </span>{' '}
+                            ×{stat.count}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
@@ -146,17 +192,40 @@ function Metric({
 function mergeStaff(timings: StaffRequestTiming[], ratings: StaffRating[]): StaffRow[] {
   const rows = new Map<string, StaffRow>();
 
+  // Timings arrive split by request type, so a person's overall figures are
+  // rebuilt here: total volume, a volume-weighted mean, and the true worst
+  // case across every type.
   for (const timing of timings) {
-    rows.set(timing.staff_id, {
-      staffId: timing.staff_id,
-      name: timing.display_name ?? timing.email,
-      role: timing.role,
-      requestsCompleted: timing.requests_completed,
+    const existing = rows.get(timing.staff_id);
+    const row =
+      existing ??
+      ({
+        staffId: timing.staff_id,
+        name: timing.display_name ?? timing.email,
+        role: timing.role,
+        requestsCompleted: 0,
+        averageMinutes: null,
+        longestMinutes: 0,
+        byType: {},
+        ratingCount: 0,
+        averageRating: null,
+      } satisfies StaffRow);
+
+    row.byType[timing.request_type] = {
+      count: timing.requests_completed,
       averageMinutes: timing.average_minutes,
       longestMinutes: timing.longest_minutes,
-      ratingCount: 0,
-      averageRating: null,
-    });
+    };
+
+    const carried = (row.averageMinutes ?? 0) * row.requestsCompleted;
+    row.requestsCompleted += timing.requests_completed;
+    row.averageMinutes =
+      row.requestsCompleted === 0
+        ? null
+        : (carried + (timing.average_minutes ?? 0) * timing.requests_completed) / row.requestsCompleted;
+    row.longestMinutes = Math.max(row.longestMinutes, timing.longest_minutes);
+
+    rows.set(timing.staff_id, row);
   }
 
   for (const rating of ratings) {
@@ -175,6 +244,7 @@ function mergeStaff(timings: StaffRequestTiming[], ratings: StaffRating[]): Staf
       requestsCompleted: 0,
       averageMinutes: null,
       longestMinutes: 0,
+      byType: {},
       ratingCount: rating.rating_count,
       averageRating: rating.average_rating,
     });
