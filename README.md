@@ -106,6 +106,116 @@ supabase db push        # applies every migration in supabase/migrations/
 supabase db execute -f supabase/seed/seed.sql
 ```
 
+## Nightly end-of-day reset
+
+A table only stops being "dining" when someone clears it, and an order only
+leaves the kitchen board when someone serves it. Whatever the closing shift
+forgot is therefore still on the manager's floor map and the KDS the next
+morning, with the turnaround timer counting into its fourteenth hour.
+`process_eod_reset()` (`supabase/migrations/0029_eod_reset.sql`) closes out
+that leftover state, and **it needs a scheduled job — the migration alone
+does not make it run.**
+
+Per restaurant, it force-closes everything belonging to a service day that
+has already ended, measured against that restaurant's own midnight
+(`restaurants.timezone`), never the server's:
+
+| What | Becomes |
+|---|---|
+| `table_sessions` still open (`ended_at is null`, started before today) | `ended_at = now()`, `end_reason = 'eod_reset'` |
+| `tables` left `dining`/`billed` from those sessions | `status = 'empty'` (the existing trigger clears `occupied_since`) |
+| `orders` still `placed`/`accepted`/`preparing`/`ready` | `status = 'served'`, `auto_closed_at = now()` |
+| `service_requests` still `pending`/`claimed` | `status = 'cancelled'` |
+
+Nothing from the current service day is touched, so an order placed at 23:50
+is still workable at 00:10 and a party seated after midnight keeps its timer.
+The function is idempotent — a second run finds nothing older than today — and
+`end_reason` keeps force-closed sessions out of the turnaround averages, so
+the reset cannot flatter or wreck the reports. Stale tickets are settled
+rather than cancelled, because `get_eod_summary` counts every order that
+isn't cancelled or voided and yesterday's takings were already banked;
+`auto_closed_at` is what distinguishes them from a ticket a waiter closed.
+
+Open **staff shifts are deliberately left alone** — a forgotten clock-out is
+a payroll correction for a manager to make, not something a cron job should
+decide.
+
+### Option A: pg_cron (recommended)
+
+Enable **Database -> Extensions -> `pg_cron`** in the dashboard, then re-run
+`0029_eod_reset.sql` — it registers the job itself once the extension exists
+(and prints a notice instead of failing if it doesn't). To do it by hand:
+
+```sql
+-- Hourly, not nightly. One nightly run cannot be nightly for a fleet in
+-- several timezones (03:00 UTC is 08:30 in Kolkata, mid-service), so the
+-- schedule ticks every hour and the function resets only the restaurants
+-- whose own clock currently reads 03:00.
+select cron.schedule(
+  'eod_reset_hourly',
+  '0 * * * *',
+  $$select public.process_eod_reset(null, 3);$$
+);
+```
+
+Check it is registered and see its run history:
+
+```sql
+select jobname, schedule, active from cron.job;
+select * from cron.job_run_details order by start_time desc limit 20;
+```
+
+Each restaurant is processed in its own subtransaction, so one tenant's bad
+data (an unusable `restaurants.timezone` is the likely cause) is rolled back
+and logged as a warning rather than aborting the reset for everyone else.
+
+### Option B: Edge Function + cron schedule
+
+If you would rather not enable `pg_cron`, deploy a function that calls the
+RPC with the **service role key** (`process_eod_reset` treats the service
+role as the scheduler and skips the membership check) and give it the same
+hourly schedule:
+
+```ts
+// supabase/functions/eod-reset/index.ts
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+Deno.serve(async () => {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+  const { data, error } = await supabase.rpc('process_eod_reset', {
+    p_restaurant_id: null,
+    p_local_hour: 3,
+  });
+  if (error) return new Response(error.message, { status: 500 });
+  return Response.json({ reset: data });
+});
+```
+
+```bash
+supabase functions deploy eod-reset
+```
+
+Then schedule it hourly — either from **Integrations -> Cron** in the
+dashboard, or with a `vercel.json` cron entry hitting a route that forwards
+to it. A Vercel Hobby plan only allows one cron run per day, which cannot
+serve multiple timezones correctly; use pg_cron or the Supabase scheduler.
+
+### Running it manually
+
+An owner or manager can reset their own restaurant at any time (useful for
+testing, or the morning after a missed run). Leaving `p_local_hour` out skips
+the local-hour gate and resets immediately:
+
+```sql
+select * from public.process_eod_reset('<restaurant-id>');
+```
+
+The returned row reports what was closed:
+`sessions_closed`, `tables_cleared`, `orders_closed`, `requests_cancelled`.
+
 ## Environment variables
 
 Copy `.env.example` to `.env.local` and fill in:

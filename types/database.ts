@@ -17,6 +17,7 @@ export type ServiceRequestType = 'waiter' | 'water' | 'bill';
 export type ServiceRequestStatus = 'pending' | 'claimed' | 'resolved' | 'cancelled';
 export type WaiterAvailability = 'free' | 'busy' | 'offline';
 export type TableStatus = 'empty' | 'dining' | 'billed';
+export type SessionEndReason = 'service' | 'eod_reset';
 
 export type Restaurant = {
   id: string;
@@ -75,6 +76,9 @@ export type TableSession = {
   started_at: string;
   billed_at: string | null;
   ended_at: string | null;
+  // Only meaningful once ended_at is set. 'eod_reset' rows were force-closed
+  // by the nightly reset and are left out of turnaround averages.
+  end_reason: SessionEndReason;
 };
 
 export type MenuCategory = {
@@ -123,6 +127,9 @@ export type Order = {
   ready_at: string | null;
   served_at: string | null;
   cancelled_at: string | null;
+  // Set when the ticket was still live at the end of its service day and
+  // process_eod_reset() settled it instead of a waiter.
+  auto_closed_at: string | null;
 };
 
 export type OrderItem = {
@@ -220,6 +227,18 @@ export type StaffRating = {
   role: MemberRole | null;
   rating_count: number;
   average_rating: number;
+};
+
+// One row per restaurant the nightly reset actually processed. Restaurants
+// whose local clock was not at the requested hour are simply absent.
+export type EodResetResult = {
+  restaurant_id: string;
+  restaurant_name: string;
+  day_start: string;
+  sessions_closed: number;
+  tables_cleared: number;
+  orders_closed: number;
+  requests_cancelled: number;
 };
 
 export type TableTurnaround = {
@@ -405,6 +424,14 @@ export type Database = {
         Args: { p_restaurant_id: string; p_day?: string | null };
         Returns: StaffRating[];
       };
+      // Normally driven by the eod_reset_hourly cron job. Omitting
+      // p_restaurant_id resets the whole fleet and is super-admin only;
+      // omitting p_local_hour resets immediately instead of waiting for
+      // the restaurant's local 03:00.
+      process_eod_reset: {
+        Args: { p_restaurant_id?: string | null; p_local_hour?: number | null };
+        Returns: EodResetResult[];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -419,6 +446,7 @@ export type Database = {
       waiter_availability: WaiterAvailability;
       table_status: TableStatus;
       order_item_status: OrderItemStatus;
+      session_end_reason: SessionEndReason;
     };
     CompositeTypes: {
       [_ in never]: never;
