@@ -5,7 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { updateRestaurantPlan, type SuperAdminActionState } from '@/app/super-admin/actions';
 import { Modal } from '@/components/super-admin/modal';
 import type { PlanType, SubscriptionStatus } from '@/types/database';
-import { formatExpiry, planLabel } from '@/lib/super-admin/subscription';
+import { formatExpiresOn, planLabel } from '@/lib/super-admin/subscription';
 
 const PRESETS = [7, 15, 30, 90] as const;
 
@@ -24,6 +24,7 @@ export function ExtendPlanModal({
   planType,
   trialEndsAt,
   expiresAt,
+  subscriptionExpiresAt,
   subscriptionStatus,
   onClose,
 }: {
@@ -32,15 +33,17 @@ export function ExtendPlanModal({
   planType: PlanType | null;
   trialEndsAt: string | null;
   expiresAt: string | null;
+  subscriptionExpiresAt?: string | null;
   subscriptionStatus: SubscriptionStatus | null;
   onClose: () => void;
 }) {
   const [state, formAction] = useFormState<SuperAdminActionState, FormData>(updateRestaurantPlan, {});
-  const [plan, setPlan] = useState<PlanType>(planType ?? 'trial');
+  const [plan, setPlan] = useState<PlanType>(planType ?? 'free_trial');
   const [days, setDays] = useState('15');
+  const expiry = subscriptionExpiresAt ?? expiresAt ?? trialEndsAt;
 
   return (
-    <Modal title="Assign or extend plan" onClose={onClose}>
+    <Modal title="Manage Plan" onClose={onClose}>
       <p className="text-sm text-text-muted mb-4">
         Update billing for <span className="text-text font-medium">{restaurantName}</span>. Adding days extends from
         today or the current end date, whichever is later.
@@ -54,13 +57,9 @@ export function ExtendPlanModal({
           <dt className="uppercase tracking-wide">Status</dt>
           <dd className="text-text mt-0.5 capitalize">{subscriptionStatus ?? '—'}</dd>
         </div>
-        <div>
-          <dt className="uppercase tracking-wide">Trial ends</dt>
-          <dd className="text-text mt-0.5">{formatExpiry(trialEndsAt)}</dd>
-        </div>
-        <div>
-          <dt className="uppercase tracking-wide">Subscription ends</dt>
-          <dd className="text-text mt-0.5">{formatExpiry(expiresAt)}</dd>
+        <div className="col-span-2">
+          <dt className="uppercase tracking-wide">Expiration</dt>
+          <dd className="text-text mt-0.5">{formatExpiresOn(expiry)}</dd>
         </div>
       </dl>
 
@@ -88,9 +87,9 @@ export function ExtendPlanModal({
               value={plan}
               onChange={(e) => setPlan(e.target.value as PlanType)}
             >
-              <option value="trial">Trial</option>
+              <option value="free_trial">Free Trial</option>
               <option value="monthly">Monthly</option>
-              <option value="annual">Annual</option>
+              <option value="yearly">Yearly</option>
             </select>
           </div>
 

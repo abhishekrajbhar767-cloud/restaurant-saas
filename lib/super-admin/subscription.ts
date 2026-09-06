@@ -1,42 +1,51 @@
-import type { PlanType, RestaurantOverviewRow, SubscriptionStatus } from '@/types/database';
+import type { PlanType, RestaurantOverviewRow, SubscriptionStatus, TrackingStatus } from '@/types/database';
 
-export const EXPIRING_SOON_DAYS = 3;
+export const EXPIRING_SOON_DAYS = 7;
 export const DEFAULT_TRIAL_DAYS = 14;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-export type ExpiryUrgency = 'expired' | 'soon' | 'ok';
+export function isTrialPlan(plan: PlanType | null): boolean {
+  return plan === 'free_trial';
+}
 
-export function relevantExpiryAt(planType: PlanType | null, trialEndsAt: string | null, expiresAt: string | null): string | null {
-  if (planType === 'trial' || (!planType && trialEndsAt && !expiresAt)) {
+export function relevantExpiryAt(
+  planType: PlanType | null,
+  trialEndsAt: string | null,
+  expiresAt: string | null,
+  subscriptionExpiresAt?: string | null
+): string | null {
+  if (subscriptionExpiresAt) return subscriptionExpiresAt;
+  if (isTrialPlan(planType) || (!planType && trialEndsAt && !expiresAt)) {
     return trialEndsAt;
   }
   return expiresAt ?? trialEndsAt;
 }
 
-export function overviewExpiryAt(row: Pick<RestaurantOverviewRow, 'plan_type' | 'trial_ends_at' | 'expires_at'>): string | null {
-  return relevantExpiryAt(row.plan_type, row.trial_ends_at, row.expires_at);
+export function overviewExpiryAt(
+  row: Pick<RestaurantOverviewRow, 'plan_type' | 'trial_ends_at' | 'expires_at' | 'subscription_expires_at'>
+): string | null {
+  return relevantExpiryAt(row.plan_type, row.trial_ends_at, row.expires_at, row.subscription_expires_at);
 }
 
 export function effectiveSubscriptionStatus(
   planType: PlanType | null,
   trialEndsAt: string | null,
-  expiresAt: string | null
+  expiresAt: string | null,
+  subscriptionExpiresAt?: string | null
 ): SubscriptionStatus {
-  const iso = relevantExpiryAt(planType, trialEndsAt, expiresAt);
+  const iso = relevantExpiryAt(planType, trialEndsAt, expiresAt, subscriptionExpiresAt);
   const now = Date.now();
-  if (planType === 'trial' || !planType) {
+  if (isTrialPlan(planType) || !planType) {
     return iso && new Date(iso).getTime() > now ? 'trialing' : 'expired';
   }
   return iso && new Date(iso).getTime() > now ? 'active' : 'expired';
 }
 
-export function expiryUrgency(iso: string | null, now = Date.now()): ExpiryUrgency {
-  if (!iso) return 'ok';
-  const ms = new Date(iso).getTime() - now;
-  if (ms <= 0) return 'expired';
-  if (ms <= EXPIRING_SOON_DAYS * MS_PER_DAY) return 'soon';
-  return 'ok';
+export function trackingStatus(iso: string | null, now = Date.now()): TrackingStatus {
+  if (!iso || new Date(iso).getTime() <= now) return 'expired';
+  if (new Date(iso).getTime() - now <= EXPIRING_SOON_DAYS * MS_PER_DAY) return 'expiring_soon';
+  return 'active';
 }
 
 export function formatExpiry(iso: string | null): string {
@@ -48,6 +57,17 @@ export function formatExpiry(iso: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** e.g. "Expires on 12 Oct 2026" / "Expired on 12 Oct 2026" */
+export function formatExpiresOn(iso: string | null, now = Date.now()): string {
+  if (!iso) return 'No expiry set';
+  const date = new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return new Date(iso).getTime() <= now ? `Expired on ${date}` : `Expires on ${date}`;
 }
 
 export function daysUntil(iso: string | null, now = Date.now()): number | null {
@@ -72,23 +92,40 @@ export function addDaysIso(fromIso: string | null, days: number, now = new Date(
 
 export function planLabel(plan: PlanType | null): string {
   if (plan === 'monthly') return 'Monthly';
-  if (plan === 'annual') return 'Annual';
-  if (plan === 'trial') return 'Trial';
+  if (plan === 'yearly') return 'Yearly';
+  if (plan === 'free_trial') return 'Free Trial';
   return '—';
+}
+
+export function trackingRank(status: TrackingStatus): number {
+  if (status === 'expired') return 0;
+  if (status === 'expiring_soon') return 1;
+  return 2;
+}
+
+export function sortBySubscriptionExpiry(rows: RestaurantOverviewRow[]): RestaurantOverviewRow[] {
+  return [...rows].sort((a, b) => {
+    const aIso = overviewExpiryAt(a);
+    const bIso = overviewExpiryAt(b);
+    const rank = trackingRank(trackingStatus(aIso)) - trackingRank(trackingStatus(bIso));
+    if (rank !== 0) return rank;
+    if (!aIso && !bIso) return 0;
+    if (!aIso) return 1;
+    if (!bIso) return -1;
+    return new Date(aIso).getTime() - new Date(bIso).getTime();
+  });
 }
 
 export function billingStats(rows: RestaurantOverviewRow[]) {
   const now = Date.now();
-  let trialing = 0;
+  let active = 0;
   let expired = 0;
   let expiringSoon = 0;
   for (const row of rows) {
-    const status = row.subscription_status;
-    if (!status) continue;
-    const urgency = expiryUrgency(overviewExpiryAt(row), now);
-    if (status === 'trialing') trialing += 1;
-    if (status === 'expired' || urgency === 'expired') expired += 1;
-    if (urgency === 'soon') expiringSoon += 1;
+    const status = trackingStatus(overviewExpiryAt(row), now);
+    if (status === 'expired') expired += 1;
+    else if (status === 'expiring_soon') expiringSoon += 1;
+    else active += 1;
   }
-  return { trialing, expired, expiringSoon };
+  return { active, expired, expiringSoon };
 }

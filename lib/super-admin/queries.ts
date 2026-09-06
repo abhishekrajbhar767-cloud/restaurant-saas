@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import type { PlatformStats, RestaurantOverviewRow, Subscription } from '@/types/database';
+import { sortBySubscriptionExpiry } from '@/lib/super-admin/subscription';
 
 export {
   getRestaurantById,
@@ -32,7 +33,7 @@ export async function getRestaurantOverview(): Promise<RestaurantOverviewRow[]> 
     console.error('get_restaurant_overview failed', error);
     throw new Error('Could not load restaurants.');
   }
-  return data ?? [];
+  return sortBySubscriptionExpiry(data ?? []);
 }
 
 export async function getRestaurantSubscription(restaurantId: string): Promise<Subscription | null> {

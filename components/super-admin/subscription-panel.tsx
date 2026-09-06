@@ -6,12 +6,11 @@ import { ResetPasswordModal } from '@/components/super-admin/reset-password-moda
 import { ExtendPlanModal } from '@/components/super-admin/extend-plan-modal';
 import type { PlanType, Subscription } from '@/types/database';
 import {
-  effectiveSubscriptionStatus,
   expiryCaption,
-  expiryUrgency,
-  formatExpiry,
+  formatExpiresOn,
   planLabel,
   relevantExpiryAt,
+  trackingStatus,
 } from '@/lib/super-admin/subscription';
 
 export function SubscriptionPanel({
@@ -33,32 +32,32 @@ export function SubscriptionPanel({
   const planType: PlanType | null = subscription?.plan_type ?? null;
   const trialEndsAt = subscription?.trial_ends_at ?? null;
   const expiresAt = subscription?.expires_at ?? null;
-  const status = effectiveSubscriptionStatus(planType, trialEndsAt, expiresAt);
-  const expiry = relevantExpiryAt(planType, trialEndsAt, expiresAt);
-  const urgency = expiryUrgency(expiry);
+  const subscriptionExpiresAt = subscription?.subscription_expires_at ?? null;
+  const expiry = relevantExpiryAt(planType, trialEndsAt, expiresAt, subscriptionExpiresAt);
+  const tracking = trackingStatus(expiry);
   const caption = expiryCaption(expiry);
 
   return (
-    <section className="card p-5">
+    <section className={`card p-5 ${tracking === 'expired' ? 'border-danger/40' : tracking === 'expiring_soon' ? 'border-amber/40' : 'border-success/30'}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-display font-bold text-sm uppercase tracking-wide text-amber mb-3">Subscription</h2>
           <div className="flex items-center gap-2 mb-2">
             <span className="font-display font-medium">{planLabel(planType)}</span>
-            <SubscriptionBadge status={status} />
+            <SubscriptionBadge status={tracking} />
           </div>
-          <div className="text-sm text-text-muted">
-            Trial ends {formatExpiry(trialEndsAt)} · Paid until {formatExpiry(expiresAt)}
+          <div
+            className={`text-sm font-medium ${
+              tracking === 'expired' ? 'text-danger' : tracking === 'expiring_soon' ? 'text-amber' : 'text-success'
+            }`}
+          >
+            {formatExpiresOn(expiry)}
           </div>
-          {caption && (
-            <div className={`text-xs mt-1 ${urgency === 'expired' ? 'text-danger' : urgency === 'soon' ? 'text-amber' : 'text-text-muted'}`}>
-              {caption}
-            </div>
-          )}
+          {caption && <div className="text-xs text-text-muted mt-1">{caption}</div>}
         </div>
         <div className="flex gap-2">
           <button type="button" className="btn-secondary text-sm" onClick={() => setShowPlan(true)}>
-            Extend plan
+            Manage Plan
           </button>
           <button type="button" className="btn-secondary text-sm" onClick={() => setShowReset(true)} disabled={!hasOwner}>
             Reset password
@@ -81,7 +80,8 @@ export function SubscriptionPanel({
           planType={planType}
           trialEndsAt={trialEndsAt}
           expiresAt={expiresAt}
-          subscriptionStatus={status}
+          subscriptionExpiresAt={subscriptionExpiresAt}
+          subscriptionStatus={subscription?.status ?? null}
           onClose={() => setShowPlan(false)}
         />
       )}

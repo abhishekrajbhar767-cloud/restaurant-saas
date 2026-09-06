@@ -171,13 +171,15 @@ begin
   update public.subscriptions
     set plan_type = 'monthly',
         trial_ends_at = now() - interval '1 day',
-        expires_at = now() + interval '60 days'
+        expires_at = now() + interval '60 days',
+        subscription_expires_at = now() + interval '60 days'
     where restaurant_id = v_urban_id;
 
   update public.subscriptions
-    set plan_type = 'trial',
+    set plan_type = 'free_trial',
         trial_ends_at = now() + interval '2 days',
-        expires_at = null
+        expires_at = null,
+        subscription_expires_at = now() + interval '2 days'
     where restaurant_id = v_royal_id;
 
   raise notice 'Seed complete. Urban Spice = %, Royal Biryani = %', v_urban_id, v_royal_id;

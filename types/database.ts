@@ -10,8 +10,9 @@
 
 export type RestaurantStatus = 'active' | 'suspended' | 'archived';
 export type MemberRole = 'super_admin' | 'owner' | 'manager' | 'kitchen' | 'waiter';
-export type PlanType = 'trial' | 'monthly' | 'annual';
+export type PlanType = 'free_trial' | 'monthly' | 'yearly';
 export type SubscriptionStatus = 'active' | 'expired' | 'trialing';
+export type TrackingStatus = 'expired' | 'expiring_soon' | 'active';
 export type FoodType = 'veg' | 'non_veg' | 'egg' | 'vegan';
 export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'served' | 'cancelled' | 'voided';
 export type OrderItemStatus = 'active' | 'voided';
@@ -83,6 +84,7 @@ export type Subscription = {
   plan_type: PlanType;
   trial_ends_at: string | null;
   expires_at: string | null;
+  subscription_expires_at: string | null;
   status: SubscriptionStatus;
   created_at: string;
   updated_at: string;
@@ -352,6 +354,7 @@ export type RestaurantOverviewRow = {
   plan_type: PlanType | null;
   trial_ends_at: string | null;
   expires_at: string | null;
+  subscription_expires_at: string | null;
   subscription_status: SubscriptionStatus | null;
 };
 
@@ -522,6 +525,7 @@ export type Database = {
       session_end_reason: SessionEndReason;
       plan_type: PlanType;
       subscription_status: SubscriptionStatus;
+      tracking_status: TrackingStatus;
     };
     CompositeTypes: {
       [_ in never]: never;

@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import { requireSuperAdmin } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { PlanType, RestaurantStatus } from '@/types/database';
+import type { RestaurantStatus } from '@/types/database';
 import { addDaysIso } from '@/lib/super-admin/subscription';
 
 const DEFAULT_CATEGORIES = ['Starters', 'Main Course', 'Desserts', 'Drinks'];
@@ -330,7 +330,7 @@ export async function resetOwnerPassword(
   return { success: 'Owner password updated. Share the temporary password with them securely — it is not stored anywhere.' };
 }
 
-const PLAN_TYPES = ['trial', 'monthly', 'annual'] as const;
+const PLAN_TYPES = ['free_trial', 'monthly', 'yearly'] as const;
 
 const UpdateRestaurantPlanSchema = z.object({
   restaurantId: z.string().uuid(),
@@ -384,19 +384,20 @@ export async function updateRestaurantPlan(
     }
     targetIso = exact.toISOString();
   } else {
-    const extendFrom =
-      planType === 'trial' ? existing?.trial_ends_at ?? null : existing?.expires_at ?? null;
+    const extendFrom = existing?.subscription_expires_at ?? existing?.expires_at ?? existing?.trial_ends_at ?? null;
     targetIso = addDaysIso(extendFrom, parsed.data.days ?? 0);
   }
 
-  const trialEndsAt = planType === 'trial' ? targetIso : existing?.trial_ends_at ?? null;
-  const expiresAt = planType === 'trial' ? existing?.expires_at ?? null : targetIso;
+  const isTrial = planType === 'free_trial';
+  const trialEndsAt = isTrial ? targetIso : existing?.trial_ends_at ?? null;
+  const expiresAt = isTrial ? existing?.expires_at ?? null : targetIso;
 
   const payload = {
     restaurant_id: restaurantId,
-    plan_type: planType as PlanType,
+    plan_type: planType,
     trial_ends_at: trialEndsAt,
     expires_at: expiresAt,
+    subscription_expires_at: targetIso,
   };
 
   const { error: writeError } = existing
