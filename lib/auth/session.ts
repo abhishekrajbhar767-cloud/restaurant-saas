@@ -68,6 +68,21 @@ export async function requireRole(allowed: MemberRole[]): Promise<UserContext> {
   return ctx;
 }
 
+/** Strict gate for /super-admin. Unlike requireRole, this does not let a tenant owner through. */
+export async function requireSuperAdmin(): Promise<UserContext> {
+  const ctx = await getUserContext();
+
+  if (!ctx) {
+    redirect('/auth/login');
+  }
+
+  if (!ctx.isSuperAdmin) {
+    redirect('/unauthorized');
+  }
+
+  return ctx;
+}
+
 export function homeRouteFor(ctx: UserContext): string {
   if (ctx.isSuperAdmin) return ROLE_HOME_ROUTE.super_admin;
   if (ctx.tenantMembership) return ROLE_HOME_ROUTE[ctx.tenantMembership.role];

@@ -10,6 +10,8 @@
 
 export type RestaurantStatus = 'active' | 'suspended' | 'archived';
 export type MemberRole = 'super_admin' | 'owner' | 'manager' | 'kitchen' | 'waiter';
+export type PlanType = 'trial' | 'monthly' | 'annual';
+export type SubscriptionStatus = 'active' | 'expired' | 'trialing';
 export type FoodType = 'veg' | 'non_veg' | 'egg' | 'vegan';
 export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'served' | 'cancelled' | 'voided';
 export type OrderItemStatus = 'active' | 'voided';
@@ -72,6 +74,17 @@ export type LoyaltySettings = {
   discount_percentage: number;
   custom_text: string;
   banner_image_url: string | null;
+  updated_at: string;
+};
+
+export type Subscription = {
+  id: string;
+  restaurant_id: string;
+  plan_type: PlanType;
+  trial_ends_at: string | null;
+  expires_at: string | null;
+  status: SubscriptionStatus;
+  created_at: string;
   updated_at: string;
 };
 
@@ -332,9 +345,14 @@ export type RestaurantOverviewRow = {
   created_at: string;
   owner_name: string | null;
   owner_email: string | null;
+  owner_user_id: string | null;
   table_count: number;
   staff_count: number;
   today_order_count: number;
+  plan_type: PlanType | null;
+  trial_ends_at: string | null;
+  expires_at: string | null;
+  subscription_status: SubscriptionStatus | null;
 };
 
 export type RestaurantStaffRow = {
@@ -388,6 +406,7 @@ export type Database = {
       customers: { Row: Customer; Insert: Partial<Customer>; Update: Partial<Customer>; Relationships: [] };
       promotional_banners: { Row: PromotionalBanner; Insert: Partial<PromotionalBanner>; Update: Partial<PromotionalBanner>; Relationships: [] };
       loyalty_settings: { Row: LoyaltySettings; Insert: Partial<LoyaltySettings>; Update: Partial<LoyaltySettings>; Relationships: [] };
+      subscriptions: { Row: Subscription; Insert: Partial<Subscription>; Update: Partial<Subscription>; Relationships: [] };
     };
     Functions: {
       create_order: {
@@ -407,6 +426,10 @@ export type Database = {
       set_waiter_availability: { Args: { p_restaurant_id: string; p_availability: WaiterAvailability }; Returns: void };
       set_table_status: { Args: { p_table_id: string; p_status: TableStatus }; Returns: void };
       auth_is_super_admin: { Args: Record<string, never>; Returns: boolean };
+      subscription_effective_status: {
+        Args: { p_plan_type: string; p_trial_ends_at: string | null; p_expires_at: string | null };
+        Returns: SubscriptionStatus;
+      };
       get_platform_stats: { Args: Record<string, never>; Returns: PlatformStats };
       get_restaurant_overview: { Args: Record<string, never>; Returns: RestaurantOverviewRow[] };
       get_restaurant_staff: { Args: { p_restaurant_id: string }; Returns: RestaurantStaffRow[] };
@@ -497,6 +520,8 @@ export type Database = {
       table_status: TableStatus;
       order_item_status: OrderItemStatus;
       session_end_reason: SessionEndReason;
+      plan_type: PlanType;
+      subscription_status: SubscriptionStatus;
     };
     CompositeTypes: {
       [_ in never]: never;

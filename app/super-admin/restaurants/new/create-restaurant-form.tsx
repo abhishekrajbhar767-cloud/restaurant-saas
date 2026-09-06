@@ -114,6 +114,7 @@ export function CreateRestaurantForm() {
           <input type="checkbox" name="seedDefaultCategories" defaultChecked className="accent-amber" />
           Start with default menu categories (Starters, Main Course, Desserts, Drinks)
         </label>
+        <p className="text-xs text-text-muted">New restaurants start on a 14-day free trial. You can extend or convert the plan from the dashboard after creation.</p>
       </fieldset>
 
       <fieldset className="space-y-4">

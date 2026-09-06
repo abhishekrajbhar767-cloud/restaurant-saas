@@ -6,6 +6,12 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.supabase.co' },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/admin/super', destination: '/super-admin', permanent: false },
+      { source: '/admin/super/:path*', destination: '/super-admin/:path*', permanent: false },
+    ];
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

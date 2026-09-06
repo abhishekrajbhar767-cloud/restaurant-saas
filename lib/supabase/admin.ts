@@ -1,12 +1,11 @@
 // lib/supabase/admin.ts
 //
-// Service-role client. Use this ONLY for the narrow set of operations that
-// genuinely require it — in this app, that's exactly one thing: inviting a
-// new restaurant owner's auth.users account via the Admin Auth API, which
-// has no RLS-scoped equivalent. Every other Super Admin action (creating a
-// restaurant row, updating status, attaching a membership) already works
-// through the ordinary server client because the RLS policies in
-// 0005_rls_policies.sql grant super_admin full access — reach for
+// Service-role client. Use this ONLY for Auth Admin API work that has no
+// RLS-scoped equivalent: creating an owner's auth.users account, or resetting
+// that owner's password via auth.admin.updateUserById. Every other Super
+// Admin action (creating a restaurant row, updating status, attaching a
+// membership, writing subscriptions) already works through the ordinary
+// server client because RLS grants super_admin full access — reach for
 // lib/supabase/server.ts first, and only drop to this file when the
 // operation is impossible under RLS.
 //

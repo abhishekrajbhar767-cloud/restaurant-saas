@@ -5,7 +5,7 @@
 // same data -- re-exported below so existing imports keep working.
 
 import { createClient } from '@/lib/supabase/server';
-import type { PlatformStats, RestaurantOverviewRow } from '@/types/database';
+import type { PlatformStats, RestaurantOverviewRow, Subscription } from '@/types/database';
 
 export {
   getRestaurantById,
@@ -33,4 +33,14 @@ export async function getRestaurantOverview(): Promise<RestaurantOverviewRow[]> 
     throw new Error('Could not load restaurants.');
   }
   return data ?? [];
+}
+
+export async function getRestaurantSubscription(restaurantId: string): Promise<Subscription | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from('subscriptions').select('*').eq('restaurant_id', restaurantId).maybeSingle();
+  if (error) {
+    console.error('getRestaurantSubscription failed', error);
+    throw new Error('Could not load subscription.');
+  }
+  return data;
 }

@@ -3,10 +3,11 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { requireRole } from '@/lib/auth/session';
+import { requireSuperAdmin } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { RestaurantStatus } from '@/types/database';
+import type { PlanType, RestaurantStatus } from '@/types/database';
+import { addDaysIso } from '@/lib/super-admin/subscription';
 
 const DEFAULT_CATEGORIES = ['Starters', 'Main Course', 'Desserts', 'Drinks'];
 
@@ -38,7 +39,7 @@ export interface CreateRestaurantState {
 }
 
 export async function createRestaurant(_prev: CreateRestaurantState, formData: FormData): Promise<CreateRestaurantState> {
-  await requireRole(['super_admin']);
+  await requireSuperAdmin();
 
   const rawSlug = (formData.get('slug') as string) || slugify((formData.get('name') as string) ?? '');
 
@@ -129,7 +130,7 @@ export async function createRestaurant(_prev: CreateRestaurantState, formData: F
 }
 
 export async function setRestaurantStatus(restaurantId: string, status: RestaurantStatus) {
-  await requireRole(['super_admin']);
+  await requireSuperAdmin();
   const supabase = createClient();
 
   const { error } = await supabase.from('restaurants').update({ status }).eq('id', restaurantId);
@@ -152,7 +153,7 @@ const RetryOwnerSchema = z.object({
 
 /** Used when the very first owner account creation failed at restaurant-creation time. */
 export async function retryOwnerCreation(_prev: CreateRestaurantState, formData: FormData): Promise<CreateRestaurantState> {
-  await requireRole(['super_admin']);
+  await requireSuperAdmin();
 
   const parsed = RetryOwnerSchema.safeParse({
     restaurantId: formData.get('restaurantId'),
@@ -210,7 +211,7 @@ export interface ReplaceOwnerState {
 }
 
 export async function replaceOwner(_prev: ReplaceOwnerState, formData: FormData): Promise<ReplaceOwnerState> {
-  await requireRole(['super_admin']);
+  await requireSuperAdmin();
 
   const parsed = ReplaceOwnerSchema.safeParse({
     restaurantId: formData.get('restaurantId'),
@@ -269,4 +270,145 @@ export async function replaceOwner(_prev: ReplaceOwnerState, formData: FormData)
 
   revalidatePath(`/super-admin/restaurants/${restaurantId}`);
   redirect(`/super-admin/restaurants/${restaurantId}`);
+}
+
+export interface SuperAdminActionState {
+  error?: string;
+  success?: string;
+}
+
+const ResetOwnerPasswordSchema = z.object({
+  restaurantId: z.string().uuid(),
+  password: z.string().min(6, 'Temporary password must be at least 6 characters'),
+});
+
+export async function resetOwnerPassword(
+  _prev: SuperAdminActionState,
+  formData: FormData
+): Promise<SuperAdminActionState> {
+  await requireSuperAdmin();
+
+  const parsed = ResetOwnerPasswordSchema.safeParse({
+    restaurantId: formData.get('restaurantId'),
+    password: formData.get('password'),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
+  }
+
+  const { restaurantId, password } = parsed.data;
+  const supabase = createClient();
+
+  const { data: owner, error: ownerError } = await supabase
+    .from('restaurant_members')
+    .select('user_id')
+    .eq('restaurant_id', restaurantId)
+    .eq('role', 'owner')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (ownerError) {
+    console.error('resetOwnerPassword: owner lookup failed', ownerError);
+    return { error: 'Could not look up the restaurant owner.' };
+  }
+  if (!owner?.user_id) {
+    return { error: 'This restaurant has no active owner to reset.' };
+  }
+
+  const admin = createAdminClient();
+  const { error: updateError } = await admin.auth.admin.updateUserById(owner.user_id, { password });
+
+  if (updateError) {
+    console.error('resetOwnerPassword: Auth Admin update failed', updateError);
+    return { error: 'Could not update the owner password. Please try again.' };
+  }
+
+  revalidatePath('/super-admin');
+  revalidatePath(`/super-admin/restaurants/${restaurantId}`);
+  return { success: 'Owner password updated. Share the temporary password with them securely — it is not stored anywhere.' };
+}
+
+const PLAN_TYPES = ['trial', 'monthly', 'annual'] as const;
+
+const UpdateRestaurantPlanSchema = z.object({
+  restaurantId: z.string().uuid(),
+  planType: z.enum(PLAN_TYPES),
+  days: z.coerce.number().int().min(1).max(3650).optional(),
+  exactAt: z.string().optional(),
+});
+
+export async function updateRestaurantPlan(
+  _prev: SuperAdminActionState,
+  formData: FormData
+): Promise<SuperAdminActionState> {
+  await requireSuperAdmin();
+
+  const daysRaw = (formData.get('days') as string | null)?.trim() ?? '';
+  const exactRaw = (formData.get('exactAt') as string | null)?.trim() ?? '';
+
+  const parsed = UpdateRestaurantPlanSchema.safeParse({
+    restaurantId: formData.get('restaurantId'),
+    planType: formData.get('planType'),
+    days: daysRaw ? daysRaw : undefined,
+    exactAt: exactRaw || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
+  }
+
+  const { restaurantId, planType } = parsed.data;
+
+  if (!parsed.data.days && !parsed.data.exactAt) {
+    return { error: 'Enter a number of days or an exact expiry date.' };
+  }
+
+  const supabase = createClient();
+  const { data: existing, error: existingError } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error('updateRestaurantPlan: load failed', existingError);
+    return { error: 'Could not load the current subscription.' };
+  }
+
+  let targetIso: string;
+  if (parsed.data.exactAt) {
+    const exact = new Date(parsed.data.exactAt);
+    if (Number.isNaN(exact.getTime())) {
+      return { error: 'Enter a valid expiry date and time.' };
+    }
+    targetIso = exact.toISOString();
+  } else {
+    const extendFrom =
+      planType === 'trial' ? existing?.trial_ends_at ?? null : existing?.expires_at ?? null;
+    targetIso = addDaysIso(extendFrom, parsed.data.days ?? 0);
+  }
+
+  const trialEndsAt = planType === 'trial' ? targetIso : existing?.trial_ends_at ?? null;
+  const expiresAt = planType === 'trial' ? existing?.expires_at ?? null : targetIso;
+
+  const payload = {
+    restaurant_id: restaurantId,
+    plan_type: planType as PlanType,
+    trial_ends_at: trialEndsAt,
+    expires_at: expiresAt,
+  };
+
+  const { error: writeError } = existing
+    ? await supabase.from('subscriptions').update(payload).eq('restaurant_id', restaurantId)
+    : await supabase.from('subscriptions').insert(payload);
+
+  if (writeError) {
+    console.error('updateRestaurantPlan: write failed', writeError);
+    return { error: 'Could not update the plan. Please try again.' };
+  }
+
+  revalidatePath('/super-admin');
+  revalidatePath(`/super-admin/restaurants/${restaurantId}`);
+  return { success: 'Plan updated.' };
 }

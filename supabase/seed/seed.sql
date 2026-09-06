@@ -165,5 +165,20 @@ begin
   insert into public.tables (restaurant_id, table_number)
   select v_royal_id, t::text from generate_series(1, 10) t;
 
+  -- Billing windows (the default-trial trigger already inserted rows).
+  -- Urban Spice is a paying monthly tenant; Royal Biryani is a trial
+  -- ending in two days so the Super Admin expiry highlighting has a demo row.
+  update public.subscriptions
+    set plan_type = 'monthly',
+        trial_ends_at = now() - interval '1 day',
+        expires_at = now() + interval '60 days'
+    where restaurant_id = v_urban_id;
+
+  update public.subscriptions
+    set plan_type = 'trial',
+        trial_ends_at = now() + interval '2 days',
+        expires_at = null
+    where restaurant_id = v_royal_id;
+
   raise notice 'Seed complete. Urban Spice = %, Royal Biryani = %', v_urban_id, v_royal_id;
 end $$;

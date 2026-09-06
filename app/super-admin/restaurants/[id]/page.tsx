@@ -4,7 +4,8 @@ import { StatCard } from '@/components/shared/stat-card';
 import { RestaurantStatusBadge } from '@/components/shared/status-badge';
 import { RestaurantStatusActions } from '@/components/super-admin/restaurant-status-actions';
 import { ManageOwnerSection, RetryOwnerForm } from './owner-form';
-import { getRestaurantById, getRestaurantStats, getRestaurantStaff, getRestaurantTables, getRecentOrders } from '@/lib/super-admin/queries';
+import { SubscriptionPanel } from '@/components/super-admin/subscription-panel';
+import { getRestaurantById, getRestaurantStats, getRestaurantStaff, getRestaurantSubscription, getRestaurantTables, getRecentOrders } from '@/lib/super-admin/queries';
 import { ROLE_LABEL } from '@/lib/auth/roles';
 
 export default async function RestaurantDetailPage({
@@ -17,11 +18,12 @@ export default async function RestaurantDetailPage({
   const restaurant = await getRestaurantById(params.id);
   if (!restaurant) notFound();
 
-  const [stats, staff, tables, orders] = await Promise.all([
+  const [stats, staff, tables, orders, subscription] = await Promise.all([
     getRestaurantStats(params.id),
     getRestaurantStaff(params.id),
     getRestaurantTables(params.id),
     getRecentOrders(params.id, 20),
+    getRestaurantSubscription(params.id),
   ]);
 
   const owner = staff.find((s) => s.role === 'owner' && s.is_active);
@@ -67,6 +69,14 @@ export default async function RestaurantDetailPage({
       </div>
 
       <ManageOwnerSection restaurantId={restaurant.id} ownerName={owner?.display_name ?? null} ownerEmail={owner?.email ?? null} />
+
+      <SubscriptionPanel
+        restaurantId={restaurant.id}
+        restaurantName={restaurant.name}
+        ownerEmail={owner?.email ?? null}
+        hasOwner={Boolean(owner)}
+        subscription={subscription}
+      />
 
       <div className="grid lg:grid-cols-2 gap-6">
         <section className="card p-5">

@@ -6,11 +6,15 @@
 //     even renders, for a snappy UX.
 //
 // It deliberately does NOT decide *which* role can see *which* page — that
-// fine-grained check lives in lib/auth/session.ts (requireRole), which is
-// re-verified against the database on every request to those layouts, and is
-// backed underneath by RLS regardless. Middleware can't see role data without
-// an extra round trip on every request, and getting that wrong here would be
-// exactly the "hiding UI elements" anti-pattern the spec calls out.
+// fine-grained check lives in lib/auth/session.ts (requireRole /
+// requireSuperAdmin), which is re-verified against restaurant_members on
+// every request to those layouts, and is backed underneath by RLS regardless.
+// Middleware can't see role data without an extra round trip on every request,
+// and getting that wrong here would be exactly the "hiding UI elements"
+// anti-pattern the spec calls out.
+//
+// /admin/super is an alias; next.config redirects it to /super-admin, which
+// is gated here (login) and then by requireSuperAdmin() in the layout.
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
