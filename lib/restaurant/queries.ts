@@ -16,6 +16,7 @@ import type {
   MenuCategory,
   MenuItem,
   OrderStatus,
+  PromotionalBanner,
 } from '@/types/database';
 
 export async function getRestaurantById(id: string): Promise<Restaurant | null> {
@@ -105,6 +106,27 @@ export async function getMenuCategories(restaurantId: string): Promise<MenuCateg
   if (error) {
     console.error('getMenuCategories failed', error);
     throw new Error('Could not load menu categories.');
+  }
+  return data ?? [];
+}
+
+export async function getPromotionalBanners(
+  restaurantId: string,
+  options: { activeOnly?: boolean } = {}
+): Promise<PromotionalBanner[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from('promotional_banners')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .order('created_at', { ascending: false });
+
+  if (options.activeOnly) query = query.eq('is_active', true);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('getPromotionalBanners failed', error);
+    throw new Error('Could not load promotional banners.');
   }
   return data ?? [];
 }

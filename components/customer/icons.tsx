@@ -231,6 +231,17 @@ export function QrCodeIcon(props: IconProps) {
   );
 }
 
+export function GiftIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="8" width="18" height="13" rx="2" />
+      <path d="M12 8v13" />
+      <path d="M3 12h18" />
+      <path d="M7.5 8a2.5 2.5 0 1 1 0-5C9.5 3 12 8 12 8s2.5-5 4.5-5a2.5 2.5 0 0 1 0 5" />
+    </Icon>
+  );
+}
+
 export function ShoppingBagIcon(props: IconProps) {
   return (
     <Icon {...props}>

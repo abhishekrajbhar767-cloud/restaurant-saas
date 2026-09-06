@@ -34,15 +34,36 @@ export type Restaurant = {
   require_table_assignment: boolean;
   enable_customer_name: boolean;
   enable_customer_mobile: boolean;
+  enable_loyalty_pass: boolean;
   created_at: string;
   updated_at: string;
 };
 
-// The switches an owner can flip on /admin/settings.
+// The switches an owner can flip on /admin/settings, plus the Loyalty Pass
+// master switch on /admin/manager.
 export type RestaurantFeatureToggle =
   | 'require_table_assignment'
   | 'enable_customer_name'
-  | 'enable_customer_mobile';
+  | 'enable_customer_mobile'
+  | 'enable_loyalty_pass';
+
+export type Customer = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  mobile_number: string;
+  visits_count: number;
+  created_at: string;
+};
+
+export type PromotionalBanner = {
+  id: string;
+  restaurant_id: string;
+  image_url: string;
+  title: string;
+  is_active: boolean;
+  created_at: string;
+};
 
 export type RestaurantMember = {
   id: string;
@@ -118,9 +139,12 @@ export type Order = {
   void_reason: string | null;
   estimated_minutes: number | null;
   cancellation_reason: string | null;
-  // Only populated when the restaurant has the matching toggle switched on.
+  // Only populated when the restaurant has the matching toggle switched on,
+  // or when a Loyalty Pass guest is attached after checkout.
   customer_name: string | null;
   customer_mobile: string | null;
+  // Set by increment_loyalty_visit() so a retried cart submit cannot punch twice.
+  loyalty_visit_recorded: boolean;
   created_at: string;
   accepted_at: string | null;
   preparing_at: string | null;
@@ -351,6 +375,8 @@ export type Database = {
       staff_shifts: { Row: StaffShift; Insert: Partial<StaffShift>; Update: Partial<StaffShift>; Relationships: [] };
       table_sessions: { Row: TableSession; Insert: Partial<TableSession>; Update: Partial<TableSession>; Relationships: [] };
       customer_ratings: { Row: CustomerRating; Insert: Partial<CustomerRating>; Update: Partial<CustomerRating>; Relationships: [] };
+      customers: { Row: Customer; Insert: Partial<Customer>; Update: Partial<Customer>; Relationships: [] };
+      promotional_banners: { Row: PromotionalBanner; Insert: Partial<PromotionalBanner>; Update: Partial<PromotionalBanner>; Relationships: [] };
     };
     Functions: {
       create_order: {
@@ -417,8 +443,21 @@ export type Database = {
           p_require_table_assignment?: boolean | null;
           p_enable_customer_name?: boolean | null;
           p_enable_customer_mobile?: boolean | null;
+          p_enable_loyalty_pass?: boolean | null;
         };
         Returns: void;
+      };
+      upsert_loyalty_customer: {
+        Args: { p_restaurant_id: string; p_name: string; p_mobile: string };
+        Returns: Customer;
+      };
+      get_loyalty_customer: {
+        Args: { p_restaurant_id: string; p_mobile: string };
+        Returns: Customer | null;
+      };
+      increment_loyalty_visit: {
+        Args: { p_order_id: string; p_mobile: string };
+        Returns: number;
       };
       get_staff_ratings: {
         Args: { p_restaurant_id: string; p_day?: string | null };

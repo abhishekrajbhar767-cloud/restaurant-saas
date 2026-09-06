@@ -2,7 +2,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { MenuApp } from '@/components/customer/menu-app';
-import type { Restaurant, RestaurantTable } from '@/types/database';
+import type { PromotionalBanner, Restaurant, RestaurantTable } from '@/types/database';
 
 type PageProps = {
   params: { restaurantSlug: string };
@@ -64,9 +64,15 @@ export default async function CustomerMenuPage({ params, searchParams }: PagePro
     table = data;
   }
 
-  const [{ data: categories }, { data: items }] = await Promise.all([
+  const [{ data: categories }, { data: items }, { data: banners }] = await Promise.all([
     supabase.from('menu_categories').select('*').eq('restaurant_id', restaurant.id).eq('is_active', true).order('sort_order'),
     supabase.from('menu_items').select('*').eq('restaurant_id', restaurant.id).order('sort_order'),
+    supabase
+      .from('promotional_banners')
+      .select('*')
+      .eq('restaurant_id', restaurant.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false }),
   ]);
 
   return (
@@ -75,6 +81,7 @@ export default async function CustomerMenuPage({ params, searchParams }: PagePro
       table={table}
       categories={categories ?? []}
       items={items ?? []}
+      banners={(banners ?? []) as PromotionalBanner[]}
       tableCodeRejected={tableToken !== undefined && table === null}
     />
   );

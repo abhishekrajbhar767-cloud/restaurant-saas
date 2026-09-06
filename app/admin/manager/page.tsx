@@ -1,6 +1,12 @@
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { getMenuCategories, getMenuItems, getRestaurantById, getRestaurantTables } from '@/lib/restaurant/queries';
+import {
+  getMenuCategories,
+  getMenuItems,
+  getPromotionalBanners,
+  getRestaurantById,
+  getRestaurantTables,
+} from '@/lib/restaurant/queries';
 import { ManagerDashboard } from '@/components/admin/manager-dashboard';
 import type { Order, ServiceRequest } from '@/types/database';
 
@@ -13,10 +19,11 @@ export default async function ManagerPage() {
 
   // Only the live slice of orders/requests is needed — the map colours a table
   // by what is open on it right now, and the realtime channel keeps it current.
-  const [tables, categories, items, { data: orders }, { data: requests }] = await Promise.all([
+  const [tables, categories, items, banners, { data: orders }, { data: requests }] = await Promise.all([
     getRestaurantTables(restaurant.id),
     getMenuCategories(restaurant.id),
     getMenuItems(restaurant.id),
+    getPromotionalBanners(restaurant.id),
     supabase
       .from('orders')
       .select('*')
@@ -45,6 +52,7 @@ export default async function ManagerPage() {
         initialItems={items}
         initialOrders={(orders ?? []) as Order[]}
         initialRequests={(requests ?? []) as ServiceRequest[]}
+        initialBanners={banners}
       />
     </div>
   );

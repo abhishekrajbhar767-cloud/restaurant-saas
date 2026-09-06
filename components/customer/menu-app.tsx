@@ -11,9 +11,27 @@ import { BrowseOnlyBanner } from '@/components/customer/browse-only-banner';
 import { FilterBar, DEFAULT_FILTERS, QUICK_PREP_MINUTES, type MenuFilters } from '@/components/customer/filter-bar';
 import { MenuSection } from '@/components/customer/menu-section';
 import { ChevronRightIcon, MenuBookIcon, SearchIcon, XIcon } from '@/components/customer/icons';
-import { loadCart, saveCart, cartTotal, cartCount, type CartLine } from '@/lib/customer/cart';
+import { loadCart, saveCart, cartTotal, cartCount, cartPayable, loyaltyDiscountAmount, type CartLine } from '@/lib/customer/cart';
+import {
+  clearLoyaltySession,
+  isLoyaltyRewardVisit,
+  loadLoyaltySession,
+  saveLoyaltySession,
+  sessionFromCustomer,
+  type LoyaltySession,
+} from '@/lib/customer/loyalty';
+import { BannerCarousel } from '@/components/customer/banner-carousel';
+import { LoyaltySheet } from '@/components/customer/loyalty-sheet';
 import { createClient } from '@/lib/supabase/client';
-import type { Restaurant, RestaurantTable, MenuCategory, MenuItem, TableStatus, FoodType } from '@/types/database';
+import type {
+  FoodType,
+  MenuCategory,
+  MenuItem,
+  PromotionalBanner,
+  Restaurant,
+  RestaurantTable,
+  TableStatus,
+} from '@/types/database';
 
 const RECOMMENDED_ID = 'category-recommended';
 const RECOMMENDED_LIMIT = 6;
@@ -23,6 +41,7 @@ export function MenuApp({
   table,
   categories,
   items,
+  banners = [],
   rating = null,
   tableCodeRejected = false,
 }: {
@@ -35,6 +54,7 @@ export function MenuApp({
   table: RestaurantTable | null;
   categories: MenuCategory[];
   items: MenuItem[];
+  banners?: PromotionalBanner[];
   /** Aggregate customer rating, when the caller has one. Renders a "New" badge otherwise. */
   rating?: RestaurantRating | null;
   /** Browse-only because the supplied table code didn't resolve, not because it was absent. */
@@ -50,6 +70,8 @@ export function MenuApp({
   const [toast, setToast] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
+  const [loyalty, setLoyalty] = useState<LoyaltySession | null>(null);
   const [tableStatus, setTableStatus] = useState<TableStatus>(table?.status ?? 'empty');
 
   useEffect(() => {
@@ -61,6 +83,27 @@ export function MenuApp({
   useEffect(() => {
     setSaved(loadSaved(restaurant.id));
   }, [restaurant.id]);
+
+  useEffect(() => {
+    if (!restaurant.enable_loyalty_pass) {
+      setLoyalty(null);
+      return;
+    }
+
+    const stored = loadLoyaltySession(restaurant.id);
+    setLoyalty(stored);
+    if (!stored) return;
+
+    const supabase = createClient();
+    void supabase
+      .rpc('get_loyalty_customer', { p_restaurant_id: restaurant.id, p_mobile: stored.mobile_number })
+      .then(({ data }) => {
+        if (!data) return;
+        const next = sessionFromCustomer(data);
+        saveLoyaltySession(restaurant.id, next);
+        setLoyalty(next);
+      });
+  }, [restaurant.id, restaurant.enable_loyalty_pass]);
 
   // A waiter seating or clearing this table is what unlocks or re-locks
   // ordering at restaurants that only accept orders from seated tables, and
@@ -241,8 +284,17 @@ export function MenuApp({
     />
   );
 
+  function persistLoyalty(next: LoyaltySession | null) {
+    if (next) saveLoyaltySession(restaurant.id, next);
+    else clearLoyaltySession(restaurant.id);
+    setLoyalty(next);
+  }
+
   const visibleCategories = categories.filter((c) => (itemsByCategory.get(c.id)?.length ?? 0) > 0);
   const itemCount = cartCount(cart);
+  const rewardVisit = restaurant.enable_loyalty_pass && isLoyaltyRewardVisit(loyalty?.visits_count);
+  const discount = loyaltyDiscountAmount(cartTotal(cart), rewardVisit);
+  const payable = cartPayable(cart, discount);
   // Zomato puts the cuisine line under the name; the closest honest analogue
   // here is what the kitchen actually serves — the menu's leading categories.
   const tagline = categories.length > 0 ? categories.slice(0, 3).map((c) => c.name).join(', ') : 'Dine-in menu';
@@ -252,6 +304,13 @@ export function MenuApp({
       {browseOnly && <BrowseOnlyBanner tableCodeRejected={tableCodeRejected} onShare={shareMenu} />}
 
       <MenuHeader restaurant={restaurant} table={table} rating={rating} prepRange={prepRange} tagline={tagline} />
+
+      <BannerCarousel
+        banners={banners}
+        loyaltyEnabled={restaurant.enable_loyalty_pass}
+        loyaltySession={loyalty}
+        onLoyaltyClick={() => setLoyaltyOpen(true)}
+      />
 
       {table && <ActiveOrders tableId={table.id} restaurantSlug={restaurant.slug} tableQrToken={table.qr_token} currency={restaurant.currency} />}
 
@@ -396,7 +455,10 @@ export function MenuApp({
               <span className="text-sm font-semibold">
                 {itemCount} item{itemCount === 1 ? '' : 's'} added
               </span>
-              <span className="text-xs text-white/80">{formatPrice(cartTotal(cart))} · plus taxes if any</span>
+              <span className="text-xs text-white/80">
+                {formatPrice(payable)}
+                {discount > 0 ? ' · 10% loyalty off' : ' · plus taxes if any'}
+              </span>
             </span>
             <span className="flex items-center gap-1 text-sm font-bold uppercase tracking-wide">
               View cart
@@ -420,6 +482,22 @@ export function MenuApp({
           askName={restaurant.enable_customer_name}
           askMobile={restaurant.enable_customer_mobile}
           needsSeating={restaurant.require_table_assignment && tableStatus === 'empty'}
+          loyaltyEnabled={restaurant.enable_loyalty_pass}
+          loyaltySession={loyalty}
+          onLoyaltyVisits={(visits) => {
+            if (!loyalty) return;
+            persistLoyalty({ ...loyalty, visits_count: visits });
+          }}
+        />
+      )}
+
+      {restaurant.enable_loyalty_pass && (
+        <LoyaltySheet
+          open={loyaltyOpen}
+          onClose={() => setLoyaltyOpen(false)}
+          restaurantId={restaurant.id}
+          session={loyalty}
+          onSession={persistLoyalty}
         />
       )}
     </div>

@@ -14,6 +14,7 @@
 // route refresh on every toggle would fight the optimistic UI.
 
 import { createClient } from '@/lib/supabase/client';
+import type { PromotionalBanner } from '@/types/database';
 
 export async function setMenuItemAvailability(itemId: string, isAvailable: boolean): Promise<{ error: string | null }> {
   const supabase = createClient();
@@ -71,4 +72,51 @@ export async function applyOrderItemDiscount(itemId: string, amount: number): Pr
   const supabase = createClient();
   const { error } = await supabase.rpc('apply_order_item_discount', { p_item_id: itemId, p_amount: amount });
   return { error: error ? rpcError(error.message, 'Could not apply that discount.') : null };
+}
+
+// ---------------- Marketing: banners ----------------
+//
+// promotional_banners_write_owner_manager is the gate. A tampered
+// restaurant_id can only come back as a rejected insert.
+
+export async function createPromotionalBanner(
+  restaurantId: string,
+  input: { imageUrl: string; title: string }
+): Promise<{ banner: PromotionalBanner | null; error: string | null }> {
+  const title = input.title.trim();
+  const imageUrl = input.imageUrl.trim();
+  if (title === '') return { banner: null, error: 'Give this offer a title.' };
+  if (imageUrl === '') return { banner: null, error: 'Paste an image link for the banner.' };
+  if (!/^https?:\/\//i.test(imageUrl)) return { banner: null, error: 'The image link must start with http:// or https://.' };
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('promotional_banners')
+    .insert({
+      restaurant_id: restaurantId,
+      image_url: imageUrl,
+      title,
+      is_active: true,
+    })
+    .select('*')
+    .single();
+  return {
+    banner: data,
+    error: error ? rpcError(error.message, 'Could not add that banner.') : null,
+  };
+}
+
+export async function setPromotionalBannerActive(bannerId: string, isActive: boolean): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from('promotional_banners').update({ is_active: isActive }).eq('id', bannerId);
+  return { error: error ? rpcError(error.message, 'Could not update that banner.') : null };
+}
+
+export async function setLoyaltyPassEnabled(restaurantId: string, enabled: boolean): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('set_restaurant_feature_toggles', {
+    p_restaurant_id: restaurantId,
+    p_enable_loyalty_pass: enabled,
+  });
+  return { error: error ? rpcError(error.message, 'Could not update Loyalty Pass.') : null };
 }

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { setMenuItemAvailability } from '@/lib/manager/actions';
 import { setTableStatus } from '@/lib/shared/table-status';
 import { AttendancePanel } from '@/components/admin/attendance-panel';
+import { MarketingOffers } from '@/components/admin/marketing-offers';
 import { MenuQuickActions } from '@/components/admin/menu-quick-actions';
 import { OrderFinancials } from '@/components/admin/order-financials';
 import {
@@ -21,6 +22,7 @@ import type {
   MenuItem,
   Order,
   Restaurant,
+  PromotionalBanner,
   RestaurantTable,
   ServiceRequest,
   TableStatus,
@@ -36,6 +38,7 @@ export function ManagerDashboard({
   initialItems,
   initialOrders,
   initialRequests,
+  initialBanners,
 }: {
   restaurant: Restaurant;
   initialTables: RestaurantTable[];
@@ -43,6 +46,7 @@ export function ManagerDashboard({
   initialItems: MenuItem[];
   initialOrders: Order[];
   initialRequests: ServiceRequest[];
+  initialBanners: PromotionalBanner[];
 }) {
   const restaurantId = restaurant.id;
   const [tables, setTables] = useState(initialTables);
@@ -272,6 +276,12 @@ export function ManagerDashboard({
         <OrderFinancials restaurantId={restaurantId} tables={tables} refreshToken={orderVersion} />
         <AttendancePanel restaurant={restaurant} />
       </div>
+
+      <MarketingOffers
+        restaurantId={restaurantId}
+        loyaltyEnabled={restaurant.enable_loyalty_pass}
+        initialBanners={initialBanners}
+      />
     </div>
   );
 }

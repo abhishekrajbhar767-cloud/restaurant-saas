@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { cartTotal, clearCart, type CartLine } from '@/lib/customer/cart';
+import { cartPayable, cartTotal, clearCart, loyaltyDiscountAmount, type CartLine } from '@/lib/customer/cart';
+import { isLoyaltyRewardVisit, type LoyaltySession } from '@/lib/customer/loyalty';
 import { MinusIcon, PlusIcon, XIcon } from '@/components/customer/icons';
 
 export function CartSheet({
@@ -19,6 +20,9 @@ export function CartSheet({
   askName,
   askMobile,
   needsSeating,
+  loyaltyEnabled = false,
+  loyaltySession = null,
+  onLoyaltyVisits,
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,13 +36,27 @@ export function CartSheet({
   askName: boolean;
   askMobile: boolean;
   needsSeating: boolean;
+  loyaltyEnabled?: boolean;
+  loyaltySession?: LoyaltySession | null;
+  onLoyaltyVisits?: (visitsCount: number) => void;
 }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
+  const [name, setName] = useState(loyaltySession?.name ?? '');
+  const [mobile, setMobile] = useState(loyaltySession?.mobile_number ?? '');
   const submittedRef = useRef(false); // synchronous guard — blocks a double-tap before React state even updates
+
+  useEffect(() => {
+    if (!loyaltySession) return;
+    setName((prev) => prev || loyaltySession.name);
+    setMobile((prev) => prev || loyaltySession.mobile_number);
+  }, [loyaltySession]);
+
+  const subtotal = cartTotal(cart);
+  const loyaltyReward = loyaltyEnabled && isLoyaltyRewardVisit(loyaltySession?.visits_count);
+  const discount = loyaltyDiscountAmount(subtotal, loyaltyReward);
+  const payable = cartPayable(cart, discount);
 
   if (!open) return null;
 
@@ -58,6 +76,9 @@ export function CartSheet({
     setIsSubmitting(true);
     setError(null);
 
+    const orderName = (askName ? name.trim() : null) || loyaltySession?.name || null;
+    const orderMobile = loyaltySession?.mobile_number || (askMobile ? mobile.trim() : null) || null;
+
     const supabase = createClient();
     const { data: orderId, error: rpcError } = await supabase.rpc('create_order', {
       p_qr_token: tableQrToken,
@@ -66,8 +87,8 @@ export function CartSheet({
         quantity: line.quantity,
         special_instructions: line.specialInstructions || null,
       })),
-      p_customer_name: askName ? name.trim() : null,
-      p_customer_mobile: askMobile ? mobile.trim() : null,
+      p_customer_name: orderName,
+      p_customer_mobile: orderMobile,
     });
 
     if (rpcError || !orderId) {
@@ -75,6 +96,14 @@ export function CartSheet({
       setIsSubmitting(false);
       setError(friendlyOrderError(rpcError?.message ?? ''));
       return;
+    }
+
+    if (loyaltyEnabled && loyaltySession) {
+      const { data: visits } = await supabase.rpc('increment_loyalty_visit', {
+        p_order_id: orderId,
+        p_mobile: loyaltySession.mobile_number,
+      });
+      if (typeof visits === 'number') onLoyaltyVisits?.(visits);
     }
 
     clearCart(tableId);
@@ -212,10 +241,28 @@ export function CartSheet({
               </p>
             )}
 
+            {loyaltyReward && (
+              <p
+                role="status"
+                className="rounded-lg border border-success/40 bg-success/15 px-3 py-2 text-sm font-medium text-zinc-100"
+              >
+                🎉 Loyalty Reward: 10% Discount Applied!
+              </p>
+            )}
+
+            {loyaltyReward && (
+              <div className="flex items-center justify-between text-sm text-zinc-400">
+                <span>Subtotal</span>
+                <span className="tabular-nums">
+                  {currency} {subtotal.toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between font-display text-base font-bold">
               <span>Total</span>
               <span className="tabular-nums">
-                {currency} {cartTotal(cart).toLocaleString('en-IN')}
+                {currency} {payable.toLocaleString('en-IN')}
               </span>
             </div>
             {error && (

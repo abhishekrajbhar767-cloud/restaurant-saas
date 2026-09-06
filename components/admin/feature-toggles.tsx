@@ -4,7 +4,9 @@ import { useState, useTransition } from 'react';
 import { setFeatureToggle } from '@/app/admin/settings/actions';
 import type { Restaurant, RestaurantFeatureToggle } from '@/types/database';
 
-const TOGGLES: { setting: RestaurantFeatureToggle; label: string; description: string }[] = [
+type SettingsToggle = Exclude<RestaurantFeatureToggle, 'enable_loyalty_pass'>;
+
+const TOGGLES: { setting: SettingsToggle; label: string; description: string }[] = [
   {
     setting: 'require_table_assignment',
     label: 'Only accept orders from seated tables',
@@ -24,16 +26,16 @@ const TOGGLES: { setting: RestaurantFeatureToggle; label: string; description: s
 ];
 
 export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
-  const [values, setValues] = useState<Record<RestaurantFeatureToggle, boolean>>({
+  const [values, setValues] = useState<Record<SettingsToggle, boolean>>({
     require_table_assignment: restaurant.require_table_assignment,
     enable_customer_name: restaurant.enable_customer_name,
     enable_customer_mobile: restaurant.enable_customer_mobile,
   });
-  const [pending, setPending] = useState<RestaurantFeatureToggle | null>(null);
+  const [pending, setPending] = useState<SettingsToggle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function handleToggle(setting: RestaurantFeatureToggle) {
+  function handleToggle(setting: SettingsToggle) {
     if (pending) return;
 
     const next = !values[setting];
