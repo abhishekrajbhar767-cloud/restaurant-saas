@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { acceptOrder, markReady, markServed, cancelOrder } from '@/lib/kitchen/actions';
+import { dispatchKitchenReadyAlert } from '@/app/waiter/push-actions';
 import { OrderTicket } from '@/components/kitchen/order-ticket';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
 import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
@@ -208,6 +209,7 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
       return;
     }
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: 'ready' as const } : o)));
+    void dispatchKitchenReadyAlert(orderId);
   }
 
   async function handleServed(orderId: string) {

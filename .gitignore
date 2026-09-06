@@ -8,6 +8,15 @@
 # production
 /build
 
+# Capacitor / Android
+/android/.gradle
+/android/app/build
+/android/build
+/android/captures
+/android/local.properties
+/android/app/google-services.json
+/ios
+
 # env files — never commit real credentials
 .env
 .env.local

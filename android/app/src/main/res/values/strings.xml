@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Restaurant OS</string>
+    <string name="title_activity_main">Restaurant OS</string>
+    <string name="package_name">com.smartrestaurant.staff</string>
+    <string name="custom_url_scheme">com.smartrestaurant.staff</string>
+</resources>

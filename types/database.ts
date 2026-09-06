@@ -382,6 +382,16 @@ export type RestaurantStats = {
   ready_orders: number;
 };
 
+export type StaffPushToken = {
+  id: string;
+  member_id: string;
+  restaurant_id: string;
+  token: string;
+  platform: 'android' | 'ios' | 'web';
+  created_at: string;
+  updated_at: string;
+};
+
 export type OrderWithItems = Order & {
   items: OrderItem[];
   table_number: string;
@@ -410,6 +420,7 @@ export type Database = {
       promotional_banners: { Row: PromotionalBanner; Insert: Partial<PromotionalBanner>; Update: Partial<PromotionalBanner>; Relationships: [] };
       loyalty_settings: { Row: LoyaltySettings; Insert: Partial<LoyaltySettings>; Update: Partial<LoyaltySettings>; Relationships: [] };
       subscriptions: { Row: Subscription; Insert: Partial<Subscription>; Update: Partial<Subscription>; Relationships: [] };
+      staff_push_tokens: { Row: StaffPushToken; Insert: Partial<StaffPushToken>; Update: Partial<StaffPushToken>; Relationships: [] };
     };
     Functions: {
       create_order: {
@@ -424,6 +435,7 @@ export type Database = {
       kitchen_accept_order: { Args: { p_order_id: string; p_estimated_minutes: number }; Returns: void };
       update_order_status: { Args: { p_order_id: string; p_new_status: OrderStatus; p_cancellation_reason?: string | null }; Returns: void };
       create_service_request: { Args: { p_qr_token: string; p_type: ServiceRequestType }; Returns: string };
+      register_staff_push_token: { Args: { p_token: string; p_platform?: string }; Returns: void };
       claim_service_request: { Args: { p_request_id: string }; Returns: boolean };
       resolve_service_request: { Args: { p_request_id: string }; Returns: void };
       set_waiter_availability: { Args: { p_restaurant_id: string; p_availability: WaiterAvailability }; Returns: void };

@@ -5,12 +5,16 @@ import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
 import { NewOrderSheet } from '@/components/waiter/new-order-sheet';
 import { TableStatusBoard } from '@/components/waiter/table-status-board';
+import { Capacitor } from '@capacitor/core';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
 import { setTableStatus } from '@/lib/shared/table-status';
 import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
+import { StaffAlertsHost, handleStaffAlert, staffAlertFromReadyOrder, staffAlertFromServiceRequest } from '@/components/waiter/staff-alerts-host';
+import { stopStaffRingtone } from '@/lib/native/NotificationService';
 import type {
   MenuCategory,
   MenuItem,
+  Order,
   RestaurantTable,
   ServiceRequestWithTable,
   ServiceRequest,
@@ -63,6 +67,8 @@ export function WaiterApp({
   // without it the rollback path can restore a status the waiter has already
   // moved on from.
   const tablesInFlightRef = useRef<Set<string>>(new Set());
+  const availabilityRef = useRef(availability);
+  availabilityRef.current = availability;
 
   function stopVibrationNow() {
     if (vibrateTimerRef.current !== null) {
@@ -108,7 +114,11 @@ export function WaiterApp({
         async (payload) => {
           const req = payload.new as ServiceRequest;
           const { data: table } = await supabase.from('tables').select('table_number').eq('id', req.table_id).maybeSingle().returns<{ table_number: string }>();
-          setRequests((prev) => [...prev, { ...req, table_number: table?.table_number ?? '—' }]);
+          const tableNumber = table?.table_number ?? '—';
+          setRequests((prev) => [...prev, { ...req, table_number: tableNumber }]);
+          if (req.status === 'pending' && availabilityRef.current === 'free') {
+            handleStaffAlert(staffAlertFromServiceRequest(req, tableNumber));
+          }
         }
       )
       .on(
@@ -133,6 +143,16 @@ export function WaiterApp({
       // Any device can seat or clear a table — the manager's live map, another
       // waiter's phone, or create_order seating a table implicitly — so the
       // board follows the row rather than only its own taps.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+        async (payload) => {
+          const order = payload.new as Order;
+          if (order.status !== 'ready') return;
+          const { data: table } = await supabase.from('tables').select('table_number').eq('id', order.table_id).maybeSingle().returns<{ table_number: string }>();
+          handleStaffAlert(staffAlertFromReadyOrder(order, table?.table_number ?? '—'));
+        }
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${restaurantId}` },
@@ -184,9 +204,12 @@ export function WaiterApp({
 
   // Phone-call ring: the native loop attribute keeps the sound ringing; this
   // effect only decides when it sounds. Stop = pause + rewind to 0.
+  // On Capacitor, NotificationService owns the loop (Native Audio + the
+  // Android foreground service) so this <audio> stays silent there.
   useEffect(() => {
     const audio = audioRef.current;
     shouldRingRef.current = pendingCount > 0 && availability === 'free';
+    if (Capacitor.isNativePlatform()) return;
     if (!audio) return;
     if (shouldRingRef.current) {
       void audio.play().catch(() => {});
@@ -252,6 +275,7 @@ export function WaiterApp({
           audio.pause();
           audio.currentTime = 0;
         }
+        void stopStaffRingtone();
       }
     }
   }
@@ -306,6 +330,7 @@ export function WaiterApp({
       audio.pause();
       audio.currentTime = 0;
     }
+    void stopStaffRingtone();
     if (!requests.some((r) => r.status === 'pending' && r.id !== requestId)) stopVibrationNow();
     setToast('You got it — head to the table');
   }
@@ -327,6 +352,7 @@ export function WaiterApp({
   return (
     <div className="max-w-lg mx-auto space-y-5">
       <audio ref={audioRef} src={RINGTONE_SRC} loop preload="auto" />
+      <StaffAlertsHost restaurantId={restaurantId} availability={availability} onAcceptRequest={handleAccept} />
 
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-ink-800 text-text text-sm px-4 py-2 rounded-full shadow-lg border border-line" role="status">

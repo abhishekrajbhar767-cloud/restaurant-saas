@@ -65,7 +65,7 @@ export function QuickActions({ tableId, tableQrToken }: { tableId: string; table
     if (activeTypes.has(type)) return; // already requested — button should be disabled anyway
     setPending(type);
     const supabase = createClient();
-    const { error } = await supabase.rpc('create_service_request', { p_qr_token: tableQrToken, p_type: type });
+    const { data: requestId, error } = await supabase.rpc('create_service_request', { p_qr_token: tableQrToken, p_type: type });
     setPending(null);
     setOpen(false);
 
@@ -80,6 +80,13 @@ export function QuickActions({ tableId, tableQrToken }: { tableId: string; table
     }
     setActiveTypes((prev) => new Set(prev).add(type));
     setToast(`${label} request sent`);
+    if (requestId) {
+      void fetch('/api/staff-alerts/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'CALL_WAITER', requestId, qrToken: tableQrToken }),
+      });
+    }
   }
 
   return (
