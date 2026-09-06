@@ -17,7 +17,9 @@ import type {
   MenuItem,
   OrderStatus,
   PromotionalBanner,
+  LoyaltySettings,
 } from '@/types/database';
+import { fallbackLoyaltySettings } from '@/lib/customer/loyalty';
 
 export async function getRestaurantById(id: string): Promise<Restaurant | null> {
   const supabase = createClient();
@@ -129,6 +131,20 @@ export async function getPromotionalBanners(
     throw new Error('Could not load promotional banners.');
   }
   return data ?? [];
+}
+
+export async function getLoyaltySettings(restaurantId: string): Promise<LoyaltySettings> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('loyalty_settings')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+  if (error) {
+    console.error('getLoyaltySettings failed', error);
+    throw new Error('Could not load loyalty settings.');
+  }
+  return data ?? fallbackLoyaltySettings(restaurantId);
 }
 
 export async function getMenuItems(restaurantId: string): Promise<MenuItem[]> {

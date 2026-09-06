@@ -14,6 +14,7 @@ import { ChevronRightIcon, MenuBookIcon, SearchIcon, XIcon } from '@/components/
 import { loadCart, saveCart, cartTotal, cartCount, cartPayable, loyaltyDiscountAmount, type CartLine } from '@/lib/customer/cart';
 import {
   clearLoyaltySession,
+  fallbackLoyaltySettings,
   isLoyaltyRewardVisit,
   loadLoyaltySession,
   saveLoyaltySession,
@@ -28,6 +29,7 @@ import type {
   MenuCategory,
   MenuItem,
   PromotionalBanner,
+  LoyaltySettings,
   Restaurant,
   RestaurantTable,
   TableStatus,
@@ -42,6 +44,7 @@ export function MenuApp({
   categories,
   items,
   banners = [],
+  loyaltySettings = null,
   rating = null,
   tableCodeRejected = false,
 }: {
@@ -55,6 +58,7 @@ export function MenuApp({
   categories: MenuCategory[];
   items: MenuItem[];
   banners?: PromotionalBanner[];
+  loyaltySettings?: LoyaltySettings | null;
   /** Aggregate customer rating, when the caller has one. Renders a "New" badge otherwise. */
   rating?: RestaurantRating | null;
   /** Browse-only because the supplied table code didn't resolve, not because it was absent. */
@@ -73,6 +77,8 @@ export function MenuApp({
   const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltySession | null>(null);
   const [tableStatus, setTableStatus] = useState<TableStatus>(table?.status ?? 'empty');
+  const loyaltyPass = loyaltySettings ?? fallbackLoyaltySettings(restaurant.id, restaurant.enable_loyalty_pass);
+  const loyaltyOn = loyaltyPass.is_enabled;
 
   useEffect(() => {
     if (!table) return;
@@ -85,7 +91,7 @@ export function MenuApp({
   }, [restaurant.id]);
 
   useEffect(() => {
-    if (!restaurant.enable_loyalty_pass) {
+    if (!loyaltyOn) {
       setLoyalty(null);
       return;
     }
@@ -103,7 +109,7 @@ export function MenuApp({
         saveLoyaltySession(restaurant.id, next);
         setLoyalty(next);
       });
-  }, [restaurant.id, restaurant.enable_loyalty_pass]);
+  }, [restaurant.id, loyaltyOn]);
 
   // A waiter seating or clearing this table is what unlocks or re-locks
   // ordering at restaurants that only accept orders from seated tables, and
@@ -292,8 +298,8 @@ export function MenuApp({
 
   const visibleCategories = categories.filter((c) => (itemsByCategory.get(c.id)?.length ?? 0) > 0);
   const itemCount = cartCount(cart);
-  const rewardVisit = restaurant.enable_loyalty_pass && isLoyaltyRewardVisit(loyalty?.visits_count);
-  const discount = loyaltyDiscountAmount(cartTotal(cart), rewardVisit);
+  const rewardVisit = loyaltyOn && isLoyaltyRewardVisit(loyalty?.visits_count, loyaltyPass.visit_threshold);
+  const discount = loyaltyDiscountAmount(cartTotal(cart), rewardVisit, loyaltyPass.discount_percentage);
   const payable = cartPayable(cart, discount);
   // Zomato puts the cuisine line under the name; the closest honest analogue
   // here is what the kitchen actually serves — the menu's leading categories.
@@ -307,7 +313,7 @@ export function MenuApp({
 
       <BannerCarousel
         banners={banners}
-        loyaltyEnabled={restaurant.enable_loyalty_pass}
+        loyalty={loyaltyPass}
         loyaltySession={loyalty}
         onLoyaltyClick={() => setLoyaltyOpen(true)}
       />
@@ -457,7 +463,7 @@ export function MenuApp({
               </span>
               <span className="text-xs text-white/80">
                 {formatPrice(payable)}
-                {discount > 0 ? ' · 10% loyalty off' : ' · plus taxes if any'}
+                {discount > 0 ? ` · ${loyaltyPass.discount_percentage}% loyalty off` : ' · plus taxes if any'}
               </span>
             </span>
             <span className="flex items-center gap-1 text-sm font-bold uppercase tracking-wide">
@@ -482,8 +488,9 @@ export function MenuApp({
           askName={restaurant.enable_customer_name}
           askMobile={restaurant.enable_customer_mobile}
           needsSeating={restaurant.require_table_assignment && tableStatus === 'empty'}
-          loyaltyEnabled={restaurant.enable_loyalty_pass}
+          loyaltyEnabled={loyaltyOn}
           loyaltySession={loyalty}
+          loyaltySettings={loyaltyPass}
           onLoyaltyVisits={(visits) => {
             if (!loyalty) return;
             persistLoyalty({ ...loyalty, visits_count: visits });
@@ -491,13 +498,14 @@ export function MenuApp({
         />
       )}
 
-      {restaurant.enable_loyalty_pass && (
+      {loyaltyOn && (
         <LoyaltySheet
           open={loyaltyOpen}
           onClose={() => setLoyaltyOpen(false)}
           restaurantId={restaurant.id}
           session={loyalty}
           onSession={persistLoyalty}
+          loyalty={loyaltyPass}
         />
       )}
     </div>

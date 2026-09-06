@@ -53,12 +53,12 @@ export function cartCount(cart: CartLine[]): number {
   return cart.reduce((sum, line) => sum + line.quantity, 0);
 }
 
-// 10% off the running subtotal when this ticket is the guest's 5th visit.
+// Dynamic % off the running subtotal when this ticket is the reward visit.
 // Rounded the same way create_order does (numeric 10,2) so the cart and the
 // kitchen ticket never disagree by a paisa.
-export function loyaltyDiscountAmount(subtotal: number, apply: boolean): number {
-  if (!apply || subtotal <= 0) return 0;
-  return Math.round(subtotal * 0.1 * 100) / 100;
+export function loyaltyDiscountAmount(subtotal: number, apply: boolean, percent = 10): number {
+  if (!apply || subtotal <= 0 || percent <= 0) return 0;
+  return Math.round(subtotal * (percent / 100) * 100) / 100;
 }
 
 export function cartPayable(cart: CartLine[], loyaltyDiscount = 0): number {

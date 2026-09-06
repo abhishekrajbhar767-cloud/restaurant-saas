@@ -2,7 +2,8 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { MenuApp } from '@/components/customer/menu-app';
-import type { PromotionalBanner, Restaurant, RestaurantTable } from '@/types/database';
+import type { LoyaltySettings, PromotionalBanner, Restaurant, RestaurantTable } from '@/types/database';
+import { fallbackLoyaltySettings } from '@/lib/customer/loyalty';
 
 type PageProps = {
   params: { restaurantSlug: string };
@@ -64,7 +65,7 @@ export default async function CustomerMenuPage({ params, searchParams }: PagePro
     table = data;
   }
 
-  const [{ data: categories }, { data: items }, { data: banners }] = await Promise.all([
+  const [{ data: categories }, { data: items }, { data: banners }, { data: loyalty }] = await Promise.all([
     supabase.from('menu_categories').select('*').eq('restaurant_id', restaurant.id).eq('is_active', true).order('sort_order'),
     supabase.from('menu_items').select('*').eq('restaurant_id', restaurant.id).order('sort_order'),
     supabase
@@ -73,6 +74,7 @@ export default async function CustomerMenuPage({ params, searchParams }: PagePro
       .eq('restaurant_id', restaurant.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false }),
+    supabase.from('loyalty_settings').select('*').eq('restaurant_id', restaurant.id).maybeSingle(),
   ]);
 
   return (
@@ -82,6 +84,7 @@ export default async function CustomerMenuPage({ params, searchParams }: PagePro
       categories={categories ?? []}
       items={items ?? []}
       banners={(banners ?? []) as PromotionalBanner[]}
+      loyaltySettings={(loyalty as LoyaltySettings | null) ?? fallbackLoyaltySettings(restaurant.id, restaurant.enable_loyalty_pass)}
       tableCodeRejected={tableToken !== undefined && table === null}
     />
   );

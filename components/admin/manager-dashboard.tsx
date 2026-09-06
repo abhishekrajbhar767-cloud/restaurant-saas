@@ -23,6 +23,7 @@ import type {
   Order,
   Restaurant,
   PromotionalBanner,
+  LoyaltySettings,
   RestaurantTable,
   ServiceRequest,
   TableStatus,
@@ -39,6 +40,7 @@ export function ManagerDashboard({
   initialOrders,
   initialRequests,
   initialBanners,
+  initialLoyalty,
 }: {
   restaurant: Restaurant;
   initialTables: RestaurantTable[];
@@ -47,6 +49,7 @@ export function ManagerDashboard({
   initialOrders: Order[];
   initialRequests: ServiceRequest[];
   initialBanners: PromotionalBanner[];
+  initialLoyalty: LoyaltySettings;
 }) {
   const restaurantId = restaurant.id;
   const [tables, setTables] = useState(initialTables);
@@ -277,11 +280,7 @@ export function ManagerDashboard({
         <AttendancePanel restaurant={restaurant} />
       </div>
 
-      <MarketingOffers
-        restaurantId={restaurantId}
-        loyaltyEnabled={restaurant.enable_loyalty_pass}
-        initialBanners={initialBanners}
-      />
+      <MarketingOffers initialLoyalty={initialLoyalty} initialBanners={initialBanners} />
     </div>
   );
 }

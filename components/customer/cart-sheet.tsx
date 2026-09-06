@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cartPayable, cartTotal, clearCart, loyaltyDiscountAmount, type CartLine } from '@/lib/customer/cart';
 import { isLoyaltyRewardVisit, type LoyaltySession } from '@/lib/customer/loyalty';
 import { MinusIcon, PlusIcon, XIcon } from '@/components/customer/icons';
+import type { LoyaltySettings } from '@/types/database';
 
 export function CartSheet({
   open,
@@ -22,6 +23,7 @@ export function CartSheet({
   needsSeating,
   loyaltyEnabled = false,
   loyaltySession = null,
+  loyaltySettings = null,
   onLoyaltyVisits,
 }: {
   open: boolean;
@@ -38,6 +40,7 @@ export function CartSheet({
   needsSeating: boolean;
   loyaltyEnabled?: boolean;
   loyaltySession?: LoyaltySession | null;
+  loyaltySettings?: LoyaltySettings | null;
   onLoyaltyVisits?: (visitsCount: number) => void;
 }) {
   const router = useRouter();
@@ -54,8 +57,10 @@ export function CartSheet({
   }, [loyaltySession]);
 
   const subtotal = cartTotal(cart);
-  const loyaltyReward = loyaltyEnabled && isLoyaltyRewardVisit(loyaltySession?.visits_count);
-  const discount = loyaltyDiscountAmount(subtotal, loyaltyReward);
+  const visitThreshold = loyaltySettings?.visit_threshold ?? 5;
+  const discountPercent = loyaltySettings?.discount_percentage ?? 10;
+  const loyaltyReward = loyaltyEnabled && isLoyaltyRewardVisit(loyaltySession?.visits_count, visitThreshold);
+  const discount = loyaltyDiscountAmount(subtotal, loyaltyReward, discountPercent);
   const payable = cartPayable(cart, discount);
 
   if (!open) return null;
@@ -246,7 +251,7 @@ export function CartSheet({
                 role="status"
                 className="rounded-lg border border-success/40 bg-success/15 px-3 py-2 text-sm font-medium text-zinc-100"
               >
-                🎉 Loyalty Reward: 10% Discount Applied!
+                🎉 Loyalty Reward: {discountPercent}% Discount Applied!
               </p>
             )}
 

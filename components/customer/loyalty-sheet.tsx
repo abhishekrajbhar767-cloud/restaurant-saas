@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { sessionFromCustomer, type LoyaltySession } from '@/lib/customer/loyalty';
+import {
+  defaultLoyaltyText,
+  isLoyaltyRewardVisit,
+  loyaltyBannerCopy,
+  sessionFromCustomer,
+  type LoyaltySession,
+} from '@/lib/customer/loyalty';
 import { XIcon } from '@/components/customer/icons';
+import type { LoyaltySettings } from '@/types/database';
 
 export function LoyaltySheet({
   open,
@@ -11,12 +18,14 @@ export function LoyaltySheet({
   restaurantId,
   session,
   onSession,
+  loyalty,
 }: {
   open: boolean;
   onClose: () => void;
   restaurantId: string;
   session: LoyaltySession | null;
   onSession: (session: LoyaltySession | null) => void;
+  loyalty: LoyaltySettings;
 }) {
   const [name, setName] = useState(session?.name ?? '');
   const [mobile, setMobile] = useState(session?.mobile_number ?? '');
@@ -97,13 +106,14 @@ export function LoyaltySheet({
           {session ? (
             <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-zinc-100">
               Signed in as <span className="font-semibold">{session.name}</span>
-              {session.visits_count === 4
-                ? ' · your next order is 10% off'
+              {isLoyaltyRewardVisit(session.visits_count, loyalty.visit_threshold)
+                ? ` · your next order is ${loyalty.discount_percentage}% off`
                 : ` · ${session.visits_count} visit${session.visits_count === 1 ? '' : 's'} so far`}
             </p>
           ) : (
             <p className="text-sm text-zinc-400">
-              Join with your name and mobile. Your 5th visit unlocks 10% off — we&apos;ll remember you on this phone.
+              Join with your name and mobile. {loyaltyBannerCopy(loyalty) || defaultLoyaltyText(loyalty.visit_threshold, loyalty.discount_percentage)}{' '}
+              We&apos;ll remember you on this phone.
             </p>
           )}
 

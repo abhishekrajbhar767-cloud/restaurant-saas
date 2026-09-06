@@ -65,6 +65,16 @@ export type PromotionalBanner = {
   created_at: string;
 };
 
+export type LoyaltySettings = {
+  restaurant_id: string;
+  is_enabled: boolean;
+  visit_threshold: number;
+  discount_percentage: number;
+  custom_text: string;
+  banner_image_url: string | null;
+  updated_at: string;
+};
+
 export type RestaurantMember = {
   id: string;
   restaurant_id: string | null;
@@ -377,6 +387,7 @@ export type Database = {
       customer_ratings: { Row: CustomerRating; Insert: Partial<CustomerRating>; Update: Partial<CustomerRating>; Relationships: [] };
       customers: { Row: Customer; Insert: Partial<Customer>; Update: Partial<Customer>; Relationships: [] };
       promotional_banners: { Row: PromotionalBanner; Insert: Partial<PromotionalBanner>; Update: Partial<PromotionalBanner>; Relationships: [] };
+      loyalty_settings: { Row: LoyaltySettings; Insert: Partial<LoyaltySettings>; Update: Partial<LoyaltySettings>; Relationships: [] };
     };
     Functions: {
       create_order: {

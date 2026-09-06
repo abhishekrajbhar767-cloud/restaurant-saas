@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import {
   getMenuCategories,
   getMenuItems,
+  getLoyaltySettings,
   getPromotionalBanners,
   getRestaurantById,
   getRestaurantTables,
@@ -19,11 +20,12 @@ export default async function ManagerPage() {
 
   // Only the live slice of orders/requests is needed — the map colours a table
   // by what is open on it right now, and the realtime channel keeps it current.
-  const [tables, categories, items, banners, { data: orders }, { data: requests }] = await Promise.all([
+  const [tables, categories, items, banners, loyalty, { data: orders }, { data: requests }] = await Promise.all([
     getRestaurantTables(restaurant.id),
     getMenuCategories(restaurant.id),
     getMenuItems(restaurant.id),
     getPromotionalBanners(restaurant.id),
+    getLoyaltySettings(restaurant.id),
     supabase
       .from('orders')
       .select('*')
@@ -53,6 +55,7 @@ export default async function ManagerPage() {
         initialOrders={(orders ?? []) as Order[]}
         initialRequests={(requests ?? []) as ServiceRequest[]}
         initialBanners={banners}
+        initialLoyalty={loyalty}
       />
     </div>
   );
