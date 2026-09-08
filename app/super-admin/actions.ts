@@ -279,7 +279,8 @@ export interface SuperAdminActionState {
 
 const ResetOwnerPasswordSchema = z.object({
   restaurantId: z.string().uuid(),
-  password: z.string().min(6, 'Temporary password must be at least 6 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirm: z.string().min(6, 'Confirm the new password'),
 });
 
 export async function resetOwnerPassword(
@@ -291,12 +292,17 @@ export async function resetOwnerPassword(
   const parsed = ResetOwnerPasswordSchema.safeParse({
     restaurantId: formData.get('restaurantId'),
     password: formData.get('password'),
+    confirm: formData.get('confirm'),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid input' };
   }
 
-  const { restaurantId, password } = parsed.data;
+  const { restaurantId, password, confirm } = parsed.data;
+  if (password !== confirm) {
+    return { error: 'Passwords do not match.' };
+  }
+
   const supabase = createClient();
 
   const { data: owner, error: ownerError } = await supabase
@@ -327,7 +333,7 @@ export async function resetOwnerPassword(
 
   revalidatePath('/super-admin');
   revalidatePath(`/super-admin/restaurants/${restaurantId}`);
-  return { success: 'Owner password updated. Share the temporary password with them securely — it is not stored anywhere.' };
+  return { success: 'Password updated. Share it with the owner directly — it is not stored or emailed.' };
 }
 
 const PLAN_TYPES = ['free_trial', 'monthly', 'yearly'] as const;

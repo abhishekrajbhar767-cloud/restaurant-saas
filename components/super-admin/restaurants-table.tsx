@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { SubscriptionBadge } from '@/components/super-admin/subscription-badge';
 import { ExtendPlanModal } from '@/components/super-admin/extend-plan-modal';
+import { ResetPasswordModal } from '@/components/super-admin/reset-password-modal';
+import { SuperAdminToast } from '@/components/super-admin/toast';
 import type { RestaurantOverviewRow, TrackingStatus } from '@/types/database';
 import {
   expiryCaption,
@@ -25,6 +27,8 @@ export function RestaurantsTable({ restaurants }: { restaurants: RestaurantOverv
   const [query, setQuery] = useState('');
   const [trackingFilter, setTrackingFilter] = useState<TrackingFilter>('all');
   const [planTarget, setPlanTarget] = useState<RestaurantOverviewRow | null>(null);
+  const [resetTarget, setResetTarget] = useState<RestaurantOverviewRow | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -116,9 +120,20 @@ export function RestaurantsTable({ restaurants }: { restaurants: RestaurantOverv
                     {caption && <div className="text-xs text-text-muted mt-0.5">{caption}</div>}
                   </td>
                   <td className="px-4 py-3">
-                    <button type="button" className="btn-secondary text-xs px-3 py-1.5" onClick={() => setPlanTarget(r)}>
-                      Manage Plan
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="btn-secondary text-xs px-3 py-1.5" onClick={() => setPlanTarget(r)}>
+                        Manage Plan
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs px-3 py-1.5"
+                        onClick={() => setResetTarget(r)}
+                        disabled={!r.owner_user_id}
+                        title={r.owner_user_id ? 'Set a new owner password' : 'No owner assigned'}
+                      >
+                        Reset Password
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -139,6 +154,16 @@ export function RestaurantsTable({ restaurants }: { restaurants: RestaurantOverv
           onClose={() => setPlanTarget(null)}
         />
       )}
+      {resetTarget && (
+        <ResetPasswordModal
+          restaurantId={resetTarget.restaurant_id}
+          restaurantName={resetTarget.name}
+          ownerEmail={resetTarget.owner_email}
+          onClose={() => setResetTarget(null)}
+          onSuccess={setToast}
+        />
+      )}
+      <SuperAdminToast message={toast} onGone={() => setToast(null)} />
     </div>
   );
 }

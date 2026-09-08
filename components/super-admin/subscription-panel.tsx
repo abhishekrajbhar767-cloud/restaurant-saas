@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SubscriptionBadge } from '@/components/super-admin/subscription-badge';
 import { ResetPasswordModal } from '@/components/super-admin/reset-password-modal';
 import { ExtendPlanModal } from '@/components/super-admin/extend-plan-modal';
+import { SuperAdminToast } from '@/components/super-admin/toast';
 import type { PlanType, Subscription } from '@/types/database';
 import {
   expiryCaption,
@@ -28,6 +29,7 @@ export function SubscriptionPanel({
 }) {
   const [showReset, setShowReset] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const planType: PlanType | null = subscription?.plan_type ?? null;
   const trialEndsAt = subscription?.trial_ends_at ?? null;
@@ -60,7 +62,7 @@ export function SubscriptionPanel({
             Manage Plan
           </button>
           <button type="button" className="btn-secondary text-sm" onClick={() => setShowReset(true)} disabled={!hasOwner}>
-            Reset password
+            Reset Password
           </button>
         </div>
       </div>
@@ -71,6 +73,7 @@ export function SubscriptionPanel({
           restaurantName={restaurantName}
           ownerEmail={ownerEmail}
           onClose={() => setShowReset(false)}
+          onSuccess={setToast}
         />
       )}
       {showPlan && (
@@ -85,6 +88,7 @@ export function SubscriptionPanel({
           onClose={() => setShowPlan(false)}
         />
       )}
+      <SuperAdminToast message={toast} onGone={() => setToast(null)} />
     </section>
   );
 }

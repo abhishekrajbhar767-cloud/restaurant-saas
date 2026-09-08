@@ -18,7 +18,7 @@ import type { Database } from '@/types/database';
 export function createAdminClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set — required for owner invitations.');
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set — required for owner invitations and password resets.');
   }
 
   return createSupabaseClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
