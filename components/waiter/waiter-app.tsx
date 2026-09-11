@@ -77,6 +77,11 @@ export function WaiterApp({
   const tablesInFlightRef = useRef<Set<string>>(new Set());
   const availabilityRef = useRef(availability);
   availabilityRef.current = availability;
+  // Read inside the tables realtime handler to tell a genuine transfer
+  // (someone else's write) apart from the echo of this waiter's own seat/
+  // assign/transfer action, which already updated local state optimistically.
+  const tablesRef = useRef(tables);
+  tablesRef.current = tables;
 
   function stopVibrationNow() {
     if (vibrateTimerRef.current !== null) {
@@ -205,9 +210,39 @@ export function WaiterApp({
             return;
           }
           const table = payload.new as RestaurantTable;
+          // Read before setTables — an action this waiter just took (seat,
+          // assign, transfer) has already applied the same value locally, so
+          // comparing against the pre-update snapshot is what tells a real
+          // transfer from another device apart from the echo of our own write.
+          const previous = tablesRef.current.find((t) => t.id === table.id);
+
           setTables((prev) =>
             prev.some((t) => t.id === table.id) ? prev.map((t) => (t.id === table.id ? { ...t, ...table } : t)) : [...prev, table]
           );
+
+          if (previous && previous.assigned_waiter_id !== table.assigned_waiter_id) {
+            if (table.assigned_waiter_id === memberId) {
+              setToast(`Table ${table.table_number} was transferred to you`);
+              void (async () => {
+                const { data: rows } = await supabase
+                  .from('orders')
+                  .select('*, order_items(*)')
+                  .eq('table_id', table.id)
+                  .eq('status', 'pending_waiter_approval');
+                const mapped = ((rows ?? []) as unknown as (Order & { order_items: OrderItem[] | null })[]).map(
+                  ({ order_items, ...rest }) => ({ ...rest, items: order_items ?? [], table_number: table.table_number })
+                );
+                if (mapped.length === 0) return;
+                setPendingApprovals((prev) => {
+                  const existingIds = new Set(prev.map((o) => o.id));
+                  return [...prev, ...mapped.filter((o) => !existingIds.has(o.id))];
+                });
+              })();
+            } else if (previous.assigned_waiter_id === memberId) {
+              setPendingApprovals((prev) => prev.filter((o) => o.table_id !== table.id));
+              setToast(`Table ${table.table_number} was transferred to another waiter`);
+            }
+          }
         }
       )
       .subscribe();
@@ -331,7 +366,17 @@ export function WaiterApp({
 
     tablesInFlightRef.current.add(tableId);
     setPendingTableIds((prev) => new Set(prev).add(tableId));
-    setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status } : t)));
+    // Mirrors set_table_status's own assignment logic (for a waiter caller)
+    // so the realtime echo of this exact write, arriving a moment later,
+    // finds nothing changed — otherwise it reads as a transfer notification
+    // for an action this waiter already knows about.
+    setTables((prev) =>
+      prev.map((t) =>
+        t.id === tableId
+          ? { ...t, status, assigned_waiter_id: status === 'empty' ? null : t.assigned_waiter_id ?? memberId }
+          : t
+      )
+    );
 
     const { error } = await setTableStatus(tableId, status);
 
@@ -343,7 +388,9 @@ export function WaiterApp({
     });
 
     if (error) {
-      setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: current.status } : t)));
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? { ...t, status: current.status, assigned_waiter_id: current.assigned_waiter_id } : t))
+      );
       setToast(`Couldn't update Table ${current.table_number} — try again.`);
       return;
     }
@@ -378,6 +425,16 @@ export function WaiterApp({
     // assigned_waiter_id; this just gives the tap instant feedback.
     setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, assigned_waiter_id: memberId } : t)));
     setToast(`Table ${current.table_number} assigned to you`);
+  }
+
+  // transfer_table already ran successfully by the time this fires (the
+  // modal calls it after a confirmed RPC response) — this just applies the
+  // result locally so the acting waiter doesn't wait on the realtime echo.
+  function handleTransferred(tableId: string, toMemberId: string, toName: string) {
+    const current = tables.find((t) => t.id === tableId);
+    setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, assigned_waiter_id: toMemberId } : t)));
+    setPendingApprovals((prev) => prev.filter((o) => o.table_id !== tableId));
+    setToast(`Table ${current?.table_number ?? ''} transferred to ${toName}`);
   }
 
   async function handleApproveOrder(orderId: string) {
@@ -558,8 +615,10 @@ export function WaiterApp({
         pendingIds={pendingTableIds}
         nowMs={nowMs}
         currentMemberId={memberId}
+        restaurantId={restaurantId}
         onSetStatus={handleSetTableStatus}
         onAssignToSelf={handleAssignToSelf}
+        onTransferred={handleTransferred}
       />
     </div>
   );

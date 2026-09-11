@@ -388,6 +388,14 @@ export type RestaurantStaffRow = {
   can_handle_billing: boolean;
 };
 
+// The transfer-target roster: on-duty waiters only, name only — narrower
+// than RestaurantStaffRow because any waiter (not just owner/manager) can
+// call get_on_duty_waiters to pick a handover target.
+export type OnDutyWaiter = {
+  member_id: string;
+  display_name: string | null;
+};
+
 export type RestaurantStats = {
   total_orders: number;
   today_orders: number;
@@ -461,6 +469,8 @@ export type Database = {
       set_table_status: { Args: { p_table_id: string; p_status: TableStatus }; Returns: void };
       assign_table_to_self: { Args: { p_table_id: string }; Returns: void };
       release_table_assignment: { Args: { p_table_id: string }; Returns: void };
+      get_on_duty_waiters: { Args: { p_restaurant_id: string }; Returns: OnDutyWaiter[] };
+      transfer_table: { Args: { p_table_id: string; p_to_member_id: string }; Returns: void };
       approve_waiter_order: { Args: { p_order_id: string }; Returns: void };
       reject_waiter_order: { Args: { p_order_id: string; p_reason?: string | null }; Returns: void };
       auth_is_super_admin: { Args: Record<string, never>; Returns: boolean };

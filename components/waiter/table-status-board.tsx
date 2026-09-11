@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { formatMinutes, minutesSince } from '@/lib/shared/duration';
+import { TransferTableModal } from '@/components/waiter/transfer-table-modal';
 import type { RestaurantTable, TableStatus } from '@/types/database';
 
 // Staff-facing names for the floor. The database calls an unoccupied table
@@ -35,15 +37,19 @@ export function TableStatusBoard({
   pendingIds,
   nowMs,
   currentMemberId,
+  restaurantId,
   onSetStatus,
   onAssignToSelf,
+  onTransferred,
 }: {
   tables: RestaurantTable[];
   pendingIds: ReadonlySet<string>;
   nowMs: number;
   currentMemberId: string;
+  restaurantId: string;
   onSetStatus: (tableId: string, status: TableStatus) => void;
   onAssignToSelf: (tableId: string) => void;
+  onTransferred: (tableId: string, toMemberId: string, toName: string) => void;
 }) {
   const freeCount = tables.filter((t) => t.status === 'empty').length;
 
@@ -67,8 +73,10 @@ export function TableStatusBoard({
               isPending={pendingIds.has(table.id)}
               nowMs={nowMs}
               currentMemberId={currentMemberId}
+              restaurantId={restaurantId}
               onSetStatus={onSetStatus}
               onAssignToSelf={onAssignToSelf}
+              onTransferred={onTransferred}
             />
           ))}
         </ul>
@@ -82,16 +90,21 @@ function TableRow({
   isPending,
   nowMs,
   currentMemberId,
+  restaurantId,
   onSetStatus,
   onAssignToSelf,
+  onTransferred,
 }: {
   table: RestaurantTable;
   isPending: boolean;
   nowMs: number;
   currentMemberId: string;
+  restaurantId: string;
   onSetStatus: (tableId: string, status: TableStatus) => void;
   onAssignToSelf: (tableId: string) => void;
+  onTransferred: (tableId: string, toMemberId: string, toName: string) => void;
 }) {
+  const [transferOpen, setTransferOpen] = useState(false);
   const isFree = table.status === 'empty';
   // nowMs is 0 until the clock starts on mount; rendering "0m" in that gap
   // would be a visible flash of a wrong number.
@@ -150,19 +163,45 @@ function TableRow({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={() => onSetStatus(table.id, isFree ? 'dining' : 'empty')}
-          aria-label={isFree ? `Seat table ${table.table_number}` : `Mark table ${table.table_number} free`}
-          className={`shrink-0 rounded px-3.5 py-2.5 font-display text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${
-            isFree
-              ? 'bg-amber text-ink-950 hover:bg-amber-bright'
-              : 'border border-success/50 text-success hover:bg-success/10'
-          }`}
-        >
-          {isFree ? 'Seat Table' : 'Mark Free'}
-        </button>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onSetStatus(table.id, isFree ? 'dining' : 'empty')}
+            aria-label={isFree ? `Seat table ${table.table_number}` : `Mark table ${table.table_number} free`}
+            className={`rounded px-3.5 py-2.5 font-display text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${
+              isFree
+                ? 'bg-amber text-ink-950 hover:bg-amber-bright'
+                : 'border border-success/50 text-success hover:bg-success/10'
+            }`}
+          >
+            {isFree ? 'Seat Table' : 'Mark Free'}
+          </button>
+          {isMine && (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => setTransferOpen(true)}
+              aria-label={`Transfer table ${table.table_number} to another waiter`}
+              className="rounded border border-line px-3.5 py-1.5 font-display text-xs font-medium text-text-muted transition-colors hover:bg-ink-800 hover:text-text disabled:opacity-50 disabled:pointer-events-none"
+            >
+              Transfer
+            </button>
+          )}
+        </div>
+      )}
+
+      {transferOpen && (
+        <TransferTableModal
+          table={table}
+          restaurantId={restaurantId}
+          currentMemberId={currentMemberId}
+          onClose={() => setTransferOpen(false)}
+          onTransferred={(toMemberId, toName) => {
+            setTransferOpen(false);
+            onTransferred(table.id, toMemberId, toName);
+          }}
+        />
       )}
     </li>
   );

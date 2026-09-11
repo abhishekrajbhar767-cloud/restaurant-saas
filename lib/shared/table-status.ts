@@ -8,7 +8,7 @@
 // a no-op status change is filtered out.
 
 import { createClient } from '@/lib/supabase/client';
-import type { TableStatus } from '@/types/database';
+import type { OnDutyWaiter, TableStatus } from '@/types/database';
 
 export async function setTableStatus(tableId: string, status: TableStatus): Promise<{ error: string | null }> {
   const supabase = createClient();
@@ -29,5 +29,20 @@ export async function assignTableToSelf(tableId: string): Promise<{ error: strin
 export async function releaseTableAssignment(tableId: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.rpc('release_table_assignment', { p_table_id: tableId });
+  return { error: error?.message ?? null };
+}
+
+// The handover target list for the transfer modal — on-duty waiters only.
+export async function getOnDutyWaiters(restaurantId: string): Promise<{ data: OnDutyWaiter[]; error: string | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('get_on_duty_waiters', { p_restaurant_id: restaurantId });
+  return { data: data ?? [], error: error?.message ?? null };
+}
+
+// Hands a seated table (and every order still awaiting approval on it) to
+// another on-duty waiter in one step.
+export async function transferTable(tableId: string, toMemberId: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('transfer_table', { p_table_id: tableId, p_to_member_id: toMemberId });
   return { error: error?.message ?? null };
 }
