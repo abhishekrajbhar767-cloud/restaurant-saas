@@ -13,6 +13,7 @@ import type { Order, OrderItem, OrderStatus } from '@/types/database';
 type ActiveOrder = Order & { items: OrderItem[] };
 
 const STATUS_LABEL: Partial<Record<OrderStatus, string>> = {
+  pending_waiter_approval: 'Awaiting approval',
   placed: 'Pending',
   accepted: 'Preparing',
   preparing: 'Preparing',
@@ -20,13 +21,14 @@ const STATUS_LABEL: Partial<Record<OrderStatus, string>> = {
 };
 
 const STATUS_STYLE: Partial<Record<OrderStatus, string>> = {
+  pending_waiter_approval: 'bg-info/20 text-info',
   placed: 'bg-white/10 text-zinc-200',
   accepted: 'bg-amber/20 text-amber-bright',
   preparing: 'bg-amber/20 text-amber-bright',
   ready: 'bg-success/20 text-success',
 };
 
-const ACTIVE_STATUSES: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready'];
+const ACTIVE_STATUSES: OrderStatus[] = ['pending_waiter_approval', 'placed', 'accepted', 'preparing', 'ready'];
 
 export function ActiveOrders({
   tableId,

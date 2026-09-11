@@ -10,6 +10,7 @@ import type { Order, OrderItem, OrderStatus, RestaurantTable, TableStatus } from
 
 const STEPS: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready', 'served'];
 const STEP_LABEL: Record<OrderStatus, string> = {
+  pending_waiter_approval: 'Awaiting approval',
   placed: 'Placed',
   accepted: 'Accepted',
   preparing: 'Preparing',
@@ -97,6 +98,7 @@ export function OrderTracker({
   const itemsTotal = activeItems.reduce((sum, i) => sum + Math.max(i.unit_price * i.quantity - Number(i.discount_amount), 0), 0);
   const total = Math.max(itemsTotal - Number(order.discount_amount), 0);
   const closed = order.status === 'cancelled' || order.status === 'voided';
+  const pendingApproval = order.status === 'pending_waiter_approval';
   // order_status has no 'billed' member — the bill lives on the table. The
   // 'served' fallback keeps feedback working for restaurants that never
   // touch the table map.
@@ -126,6 +128,14 @@ export function OrderTracker({
           {(order.void_reason || order.cancellation_reason) && (
             <p className="text-sm text-text-onPaper/70">{order.void_reason ?? order.cancellation_reason}</p>
           )}
+        </div>
+      ) : pendingApproval ? (
+        <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info/5 p-5">
+          <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-info" aria-hidden />
+          <div>
+            <p className="font-display font-bold text-info">Waiting for a waiter to approve</p>
+            <p className="mt-0.5 text-sm text-text-onPaper/70">Your order will move to the kitchen as soon as it's approved.</p>
+          </div>
         </div>
       ) : (
         <ol className="space-y-0 mb-6" aria-label="Order status">

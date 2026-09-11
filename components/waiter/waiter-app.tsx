@@ -5,9 +5,11 @@ import { createClient } from '@/lib/supabase/client';
 import { RequestCard } from '@/components/waiter/request-card';
 import { NewOrderSheet } from '@/components/waiter/new-order-sheet';
 import { TableStatusBoard } from '@/components/waiter/table-status-board';
+import { OrderApprovalCard } from '@/components/waiter/order-approval-card';
 import { Capacitor } from '@capacitor/core';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
-import { setTableStatus } from '@/lib/shared/table-status';
+import { assignTableToSelf, setTableStatus } from '@/lib/shared/table-status';
+import { approveOrder, rejectOrder } from '@/lib/waiter/order-approval';
 import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
 import { StaffAlertsHost, handleStaffAlert, staffAlertFromReadyOrder, staffAlertFromServiceRequest } from '@/components/waiter/staff-alerts-host';
 import { stopStaffRingtone } from '@/lib/native/NotificationService';
@@ -15,6 +17,8 @@ import type {
   MenuCategory,
   MenuItem,
   Order,
+  OrderItem,
+  OrderWithItems,
   RestaurantTable,
   ServiceRequestWithTable,
   ServiceRequest,
@@ -32,6 +36,7 @@ export function WaiterApp({
   initialAvailability,
   initialRequests,
   initialTables,
+  initialPendingApprovals,
   categories,
   menuItems,
   currency,
@@ -43,6 +48,7 @@ export function WaiterApp({
   initialAvailability: WaiterAvailability;
   initialRequests: ServiceRequestWithTable[];
   initialTables: RestaurantTable[];
+  initialPendingApprovals: OrderWithItems[];
   categories: MenuCategory[];
   menuItems: MenuItem[];
   currency: string;
@@ -52,6 +58,8 @@ export function WaiterApp({
   const [availability, setAvailability] = useState<WaiterAvailability>(initialAvailability);
   const [requests, setRequests] = useState<ServiceRequestWithTable[]>(initialRequests);
   const [tables, setTables] = useState<RestaurantTable[]>(initialTables);
+  const [pendingApprovals, setPendingApprovals] = useState<OrderWithItems[]>(initialPendingApprovals);
+  const [approvalActionIds, setApprovalActionIds] = useState<ReadonlySet<string>>(new Set());
   const [pendingTableIds, setPendingTableIds] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
@@ -140,6 +148,33 @@ export function WaiterApp({
           setAvailability((payload.new as WaiterStatusRow).availability);
         }
       )
+      // A new QR order lands here as pending_waiter_approval when the
+      // restaurant has approval turned on. Only surface it if this waiter
+      // owns the table (or nobody does yet) — a table assigned to someone
+      // else is their queue, not this one.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+        async (payload) => {
+          const order = payload.new as Order;
+          if (order.status !== 'pending_waiter_approval') return;
+
+          const [{ data: table }, { data: items }] = await Promise.all([
+            supabase.from('tables').select('table_number, assigned_waiter_id').eq('id', order.table_id).maybeSingle().returns<{
+              table_number: string;
+              assigned_waiter_id: string | null;
+            }>(),
+            supabase.from('order_items').select('*').eq('order_id', order.id).returns<OrderItem[]>(),
+          ]);
+          if (table && table.assigned_waiter_id !== null && table.assigned_waiter_id !== memberId) return;
+
+          setPendingApprovals((prev) =>
+            prev.some((o) => o.id === order.id) ? prev : [...prev, { ...order, items: items ?? [], table_number: table?.table_number ?? '—' }]
+          );
+          setToast(`Table ${table?.table_number ?? '—'} — new order needs your approval`);
+          navigator.vibrate?.(VIBRATE_PATTERN);
+        }
+      )
       // Any device can seat or clear a table — the manager's live map, another
       // waiter's phone, or create_order seating a table implicitly — so the
       // board follows the row rather than only its own taps.
@@ -148,6 +183,13 @@ export function WaiterApp({
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
         async (payload) => {
           const order = payload.new as Order;
+
+          if (order.status !== 'pending_waiter_approval') {
+            // Approved/rejected/voided elsewhere (another device, a manager) —
+            // this waiter's approval queue must drop it either way.
+            setPendingApprovals((prev) => prev.filter((o) => o.id !== order.id));
+          }
+
           if (order.status !== 'ready') return;
           const { data: table } = await supabase.from('tables').select('table_number').eq('id', order.table_id).maybeSingle().returns<{ table_number: string }>();
           handleStaffAlert(staffAlertFromReadyOrder(order, table?.table_number ?? '—'));
@@ -312,6 +354,72 @@ export function WaiterApp({
     );
   }
 
+  async function handleAssignToSelf(tableId: string) {
+    const current = tables.find((t) => t.id === tableId);
+    if (!current || tablesInFlightRef.current.has(tableId)) return;
+
+    tablesInFlightRef.current.add(tableId);
+    setPendingTableIds((prev) => new Set(prev).add(tableId));
+
+    const { error } = await assignTableToSelf(tableId);
+
+    tablesInFlightRef.current.delete(tableId);
+    setPendingTableIds((prev) => {
+      const next = new Set(prev);
+      next.delete(tableId);
+      return next;
+    });
+
+    if (error) {
+      setToast(`Couldn't assign Table ${current.table_number} — try again.`);
+      return;
+    }
+    // The realtime '*' subscription on tables applies the authoritative
+    // assigned_waiter_id; this just gives the tap instant feedback.
+    setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, assigned_waiter_id: memberId } : t)));
+    setToast(`Table ${current.table_number} assigned to you`);
+  }
+
+  async function handleApproveOrder(orderId: string) {
+    if (approvalActionIds.has(orderId)) return;
+    setApprovalActionIds((prev) => new Set(prev).add(orderId));
+
+    const { error } = await approveOrder(orderId);
+
+    setApprovalActionIds((prev) => {
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+
+    if (error) {
+      setToast("Couldn't approve that order — try again.");
+      return;
+    }
+    setPendingApprovals((prev) => prev.filter((o) => o.id !== orderId));
+    setToast('Order approved — sent to the kitchen.');
+  }
+
+  async function handleRejectOrder(orderId: string, reason: string) {
+    if (approvalActionIds.has(orderId)) return;
+    setApprovalActionIds((prev) => new Set(prev).add(orderId));
+
+    const { error } = await rejectOrder(orderId, reason);
+
+    setApprovalActionIds((prev) => {
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+
+    if (error) {
+      setToast("Couldn't reject that order — try again.");
+      return;
+    }
+    setPendingApprovals((prev) => prev.filter((o) => o.id !== orderId));
+    setToast('Order rejected.');
+  }
+
   async function handleAccept(requestId: string) {
     const supabase = createClient();
     const { data: claimed, error } = await supabase.rpc('claim_service_request', { p_request_id: requestId });
@@ -394,6 +502,25 @@ export function WaiterApp({
         />
       )}
 
+      {pendingApprovals.length > 0 && (
+        <section>
+          <h2 className="font-display font-bold text-sm uppercase tracking-wide text-info mb-2">
+            Needs Approval ({pendingApprovals.length})
+          </h2>
+          <div className="space-y-2">
+            {pendingApprovals.map((order) => (
+              <OrderApprovalCard
+                key={order.id}
+                order={order}
+                isPending={approvalActionIds.has(order.id)}
+                onApprove={() => handleApproveOrder(order.id)}
+                onReject={(reason) => handleRejectOrder(order.id, reason)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <h2 className="font-display font-bold text-sm uppercase tracking-wide text-text-muted mb-2">
           Waiting ({pending.length})
@@ -430,7 +557,9 @@ export function WaiterApp({
         tables={activeTables}
         pendingIds={pendingTableIds}
         nowMs={nowMs}
+        currentMemberId={memberId}
         onSetStatus={handleSetTableStatus}
+        onAssignToSelf={handleAssignToSelf}
       />
     </div>
   );

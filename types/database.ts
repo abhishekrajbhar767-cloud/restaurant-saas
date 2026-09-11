@@ -14,7 +14,15 @@ export type PlanType = 'free_trial' | 'monthly' | 'yearly';
 export type SubscriptionStatus = 'active' | 'expired' | 'trialing';
 export type TrackingStatus = 'expired' | 'expiring_soon' | 'active';
 export type FoodType = 'veg' | 'non_veg' | 'egg' | 'vegan';
-export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'served' | 'cancelled' | 'voided';
+export type OrderStatus =
+  | 'pending_waiter_approval'
+  | 'placed'
+  | 'accepted'
+  | 'preparing'
+  | 'ready'
+  | 'served'
+  | 'cancelled'
+  | 'voided';
 export type OrderItemStatus = 'active' | 'voided';
 export type ServiceRequestType = 'waiter' | 'water' | 'bill';
 export type ServiceRequestStatus = 'pending' | 'claimed' | 'resolved' | 'cancelled';
@@ -116,6 +124,9 @@ export type RestaurantTable = {
   // Set by the track_table_session trigger, cleared when the table goes
   // back to empty. Null means nobody is seated.
   occupied_since: string | null;
+  // The waiter currently serving this table. Set automatically when a
+  // waiter seats it, cleared when it's freed. Null means unclaimed.
+  assigned_waiter_id: string | null;
   created_at: string;
 };
 
@@ -129,6 +140,8 @@ export type TableSession = {
   // Only meaningful once ended_at is set. 'eod_reset' rows were force-closed
   // by the nightly reset and are left out of turnaround averages.
   end_reason: SessionEndReason;
+  // Mirrors tables.assigned_waiter_id as it was while this session was open.
+  assigned_waiter_id: string | null;
 };
 
 export type MenuCategory = {
@@ -446,6 +459,10 @@ export type Database = {
       resolve_service_request: { Args: { p_request_id: string }; Returns: void };
       set_waiter_availability: { Args: { p_restaurant_id: string; p_availability: WaiterAvailability }; Returns: void };
       set_table_status: { Args: { p_table_id: string; p_status: TableStatus }; Returns: void };
+      assign_table_to_self: { Args: { p_table_id: string }; Returns: void };
+      release_table_assignment: { Args: { p_table_id: string }; Returns: void };
+      approve_waiter_order: { Args: { p_order_id: string }; Returns: void };
+      reject_waiter_order: { Args: { p_order_id: string; p_reason?: string | null }; Returns: void };
       auth_is_super_admin: { Args: Record<string, never>; Returns: boolean };
       subscription_effective_status: {
         Args: { p_plan_type: string; p_trial_ends_at: string | null; p_expires_at: string | null };

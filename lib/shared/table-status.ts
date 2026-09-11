@@ -15,3 +15,19 @@ export async function setTableStatus(tableId: string, status: TableStatus): Prom
   const { error } = await supabase.rpc('set_table_status', { p_table_id: tableId, p_status: status });
   return { error: error?.message ?? null };
 }
+
+// Claims an already-occupied-but-unassigned table (seated by a manager, or
+// from before this feature existed) without touching its status.
+export async function assignTableToSelf(tableId: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('assign_table_to_self', { p_table_id: tableId });
+  return { error: error?.message ?? null };
+}
+
+// Hands the table back without freeing it — a manager reassigns it, or
+// another waiter takes over the same seating.
+export async function releaseTableAssignment(tableId: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('release_table_assignment', { p_table_id: tableId });
+  return { error: error?.message ?? null };
+}

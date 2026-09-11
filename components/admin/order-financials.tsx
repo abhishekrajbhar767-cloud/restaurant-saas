@@ -7,6 +7,7 @@ import { formatMoney, orderNetTotal } from '@/lib/manager/totals';
 import type { Order, OrderItem, OrderStatus, RestaurantTable } from '@/types/database';
 
 const STATUS_TONE: Record<OrderStatus, string> = {
+  pending_waiter_approval: 'text-info',
   placed: 'text-text-muted',
   accepted: 'text-amber',
   preparing: 'text-amber',

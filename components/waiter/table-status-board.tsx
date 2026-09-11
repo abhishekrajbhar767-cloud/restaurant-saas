@@ -34,12 +34,16 @@ export function TableStatusBoard({
   tables,
   pendingIds,
   nowMs,
+  currentMemberId,
   onSetStatus,
+  onAssignToSelf,
 }: {
   tables: RestaurantTable[];
   pendingIds: ReadonlySet<string>;
   nowMs: number;
+  currentMemberId: string;
   onSetStatus: (tableId: string, status: TableStatus) => void;
+  onAssignToSelf: (tableId: string) => void;
 }) {
   const freeCount = tables.filter((t) => t.status === 'empty').length;
 
@@ -62,7 +66,9 @@ export function TableStatusBoard({
               table={table}
               isPending={pendingIds.has(table.id)}
               nowMs={nowMs}
+              currentMemberId={currentMemberId}
               onSetStatus={onSetStatus}
+              onAssignToSelf={onAssignToSelf}
             />
           ))}
         </ul>
@@ -75,17 +81,25 @@ function TableRow({
   table,
   isPending,
   nowMs,
+  currentMemberId,
   onSetStatus,
+  onAssignToSelf,
 }: {
   table: RestaurantTable;
   isPending: boolean;
   nowMs: number;
+  currentMemberId: string;
   onSetStatus: (tableId: string, status: TableStatus) => void;
+  onAssignToSelf: (tableId: string) => void;
 }) {
   const isFree = table.status === 'empty';
   // nowMs is 0 until the clock starts on mount; rendering "0m" in that gap
   // would be a visible flash of a wrong number.
   const occupiedMinutes = nowMs > 0 && table.occupied_since && !isFree ? minutesSince(table.occupied_since, nowMs) : null;
+
+  const isMine = table.assigned_waiter_id === currentMemberId;
+  const isOthers = table.assigned_waiter_id !== null && !isMine;
+  const isUnclaimed = !isFree && table.assigned_waiter_id === null;
 
   return (
     <li
@@ -105,21 +119,51 @@ function TableRow({
             </span>
           )}
         </p>
+        {!isFree && (
+          <p className="mt-0.5 text-[11px] font-medium">
+            {isMine && <span className="text-info">Assigned to you</span>}
+            {isOthers && <span className="text-text-muted">Assigned to another waiter</span>}
+            {isUnclaimed && <span className="text-text-muted">Unclaimed</span>}
+          </p>
+        )}
       </div>
 
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={() => onSetStatus(table.id, isFree ? 'dining' : 'empty')}
-        aria-label={isFree ? `Seat table ${table.table_number}` : `Mark table ${table.table_number} free`}
-        className={`shrink-0 rounded px-3.5 py-2.5 font-display text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${
-          isFree
-            ? 'bg-amber text-ink-950 hover:bg-amber-bright'
-            : 'border border-success/50 text-success hover:bg-success/10'
-        }`}
-      >
-        {isFree ? 'Seat Table' : 'Mark Free'}
-      </button>
+      {isOthers ? null : isUnclaimed ? (
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onAssignToSelf(table.id)}
+            aria-label={`Assign table ${table.table_number} to yourself`}
+            className="rounded border border-info/50 px-3.5 py-1.5 font-display text-xs font-medium text-info transition-colors hover:bg-info/10 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            Assign to me
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onSetStatus(table.id, 'empty')}
+            aria-label={`Mark table ${table.table_number} free`}
+            className="rounded border border-success/50 px-3.5 py-1.5 font-display text-xs font-medium text-success transition-colors hover:bg-success/10 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            Mark Free
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => onSetStatus(table.id, isFree ? 'dining' : 'empty')}
+          aria-label={isFree ? `Seat table ${table.table_number}` : `Mark table ${table.table_number} free`}
+          className={`shrink-0 rounded px-3.5 py-2.5 font-display text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${
+            isFree
+              ? 'bg-amber text-ink-950 hover:bg-amber-bright'
+              : 'border border-success/50 text-success hover:bg-success/10'
+          }`}
+        >
+          {isFree ? 'Seat Table' : 'Mark Free'}
+        </button>
+      )}
     </li>
   );
 }
