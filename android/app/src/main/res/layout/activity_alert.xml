@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/alert_ink"
+    android:gravity="center_horizontal"
+    android:keepScreenOn="true"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <FrameLayout
+        android:layout_width="112dp"
+        android:layout_height="112dp"
+        android:background="@drawable/alert_pulse_ring">
+
+        <TextView
+            android:id="@+id/alert_pulse"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:letterSpacing="0.08"
+            android:text="@string/alert_pulse_call"
+            android:textAllCaps="true"
+            android:textColor="@color/alert_amber"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/alert_kicker"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:letterSpacing="0.18"
+        android:text="@string/alert_kicker_floor"
+        android:textAllCaps="true"
+        android:textColor="@color/alert_muted"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/alert_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="@string/alert_default_title"
+        android:textColor="@color/alert_text"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/alert_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="@string/alert_default_body"
+        android:textColor="@color/alert_muted"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/alert_table"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:textColor="@color/alert_amber"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/alert_dismiss"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@drawable/alert_btn_primary"
+        android:text="@string/alert_dismiss"
+        android:textAllCaps="false"
+        android:textColor="@color/alert_ink"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/alert_open"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/alert_btn_secondary"
+        android:text="@string/alert_open_app"
+        android:textAllCaps="false"
+        android:textColor="@color/alert_amber"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+</LinearLayout>

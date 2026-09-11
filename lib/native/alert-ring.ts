@@ -9,10 +9,27 @@ export type AlertRingStartOptions = {
   requestId?: string;
 };
 
+export type AlertPermissionStatus = {
+  overlay: boolean;
+  batteryOptimizationsIgnored: boolean;
+  fullScreenIntent: boolean;
+  location: boolean;
+};
+
+export type PermissionPromptResult = {
+  granted: boolean;
+  requested: boolean;
+};
+
 export interface AlertRingPlugin {
   start(options: AlertRingStartOptions): Promise<void>;
   stop(): Promise<void>;
-  requestIgnoreBatteryOptimizations(): Promise<{ requested: boolean }>;
+  checkAlertPermissions(): Promise<AlertPermissionStatus>;
+  requestIgnoreBatteryOptimizations(): Promise<PermissionPromptResult>;
+  requestOverlayPermission(): Promise<PermissionPromptResult>;
+  requestFullScreenIntentPermission(): Promise<PermissionPromptResult>;
+  requestCriticalPermissions(): Promise<{ opened: string }>;
+  requestLocationPermissions(): Promise<{ granted: boolean }>;
 }
 
 const AlertRing = registerPlugin<AlertRingPlugin>('AlertRing', {

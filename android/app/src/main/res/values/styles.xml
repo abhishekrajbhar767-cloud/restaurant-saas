@@ -19,4 +19,13 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <style name="AppTheme.Alert" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/alert_ink</item>
+        <item name="android:statusBarColor">@color/alert_ink</item>
+        <item name="android:navigationBarColor">@color/alert_ink</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
 </resources>

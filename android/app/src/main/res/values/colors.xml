@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#E8A33D</color>
+    <color name="colorPrimaryDark">#0E1116</color>
+    <color name="colorAccent">#E8A33D</color>
+    <color name="alert_ink">#0E1116</color>
+    <color name="alert_ink_800">#1A1F2E</color>
+    <color name="alert_amber">#E8A33D</color>
+    <color name="alert_text">#F4F1EA</color>
+    <color name="alert_muted">#9AA3B2</color>
+    <color name="alert_danger">#E23744</color>
+</resources>

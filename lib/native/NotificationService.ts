@@ -189,7 +189,7 @@ export async function initNotificationService(): Promise<void> {
   });
 
   try {
-    await AlertRing.requestIgnoreBatteryOptimizations();
+    await AlertRing.requestCriticalPermissions();
   } catch {
     // Optional — ringing still works while the OS hasn't killed the process.
   }

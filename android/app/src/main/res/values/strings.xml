@@ -4,4 +4,13 @@
     <string name="title_activity_main">Restaurant OS</string>
     <string name="package_name">com.smartrestaurant.staff</string>
     <string name="custom_url_scheme">com.smartrestaurant.staff</string>
+    <string name="alert_default_title">Staff alert</string>
+    <string name="alert_default_body">Incoming floor alert</string>
+    <string name="alert_dismiss">Dismiss</string>
+    <string name="alert_open_app">Open app</string>
+    <string name="alert_pulse_call">Call</string>
+    <string name="alert_pulse_ready">Ready</string>
+    <string name="alert_kicker_floor">Floor</string>
+    <string name="alert_kicker_kitchen">Kitchen</string>
+    <string name="alert_table">Table %1$s</string>
 </resources>

@@ -15,16 +15,19 @@ const DEFAULT_OPTIONS: PositionOptions = {
   maximumAge: 30_000,
 };
 
-export function getCurrentPosition(options: PositionOptions = DEFAULT_OPTIONS): Promise<GeolocationResult> {
+export async function getCurrentPosition(options: PositionOptions = DEFAULT_OPTIONS): Promise<GeolocationResult> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    return Promise.resolve({ error: 'This device or browser cannot report location.' });
+    return { error: 'This device or browser cannot report location.' };
   }
 
   // Chrome and Safari both refuse geolocation outside a secure context, and
   // the resulting error is otherwise indistinguishable from a denial.
   if (typeof window !== 'undefined' && !window.isSecureContext) {
-    return Promise.resolve({ error: 'Location needs a secure (https) connection.' });
+    return { error: 'Location needs a secure (https) connection.' };
   }
+
+  const nativeDenied = await requestNativeLocationPermission();
+  if (nativeDenied) return { error: nativeDenied };
 
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
@@ -40,6 +43,20 @@ export function getCurrentPosition(options: PositionOptions = DEFAULT_OPTIONS): 
       options
     );
   });
+}
+
+async function requestNativeLocationPermission(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()) return null;
+    const { AlertRing } = await import('@/lib/native/alert-ring');
+    const result = await AlertRing.requestLocationPermissions();
+    if (result.granted) return null;
+    return 'Location permission was denied. Allow “While using the app” for Restaurant OS and try again.';
+  } catch {
+    return null;
+  }
 }
 
 function describeError(error: GeolocationPositionError): string {
