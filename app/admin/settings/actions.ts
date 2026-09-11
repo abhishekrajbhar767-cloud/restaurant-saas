@@ -103,6 +103,7 @@ const ToggleSchema = z.object({
     'enable_customer_name',
     'enable_customer_mobile',
     'enable_loyalty_pass',
+    'require_waiter_approval',
   ]),
   enabled: z.boolean(),
 });
@@ -126,6 +127,7 @@ export async function setFeatureToggle(
     p_enable_customer_name: parsed.data.setting === 'enable_customer_name' ? parsed.data.enabled : null,
     p_enable_customer_mobile: parsed.data.setting === 'enable_customer_mobile' ? parsed.data.enabled : null,
     p_enable_loyalty_pass: parsed.data.setting === 'enable_loyalty_pass' ? parsed.data.enabled : null,
+    p_require_waiter_approval: parsed.data.setting === 'require_waiter_approval' ? parsed.data.enabled : null,
   });
 
   if (error) return { error: error.message || 'Could not save that setting.' };

@@ -38,6 +38,7 @@ export type Restaurant = {
   enable_customer_name: boolean;
   enable_customer_mobile: boolean;
   enable_loyalty_pass: boolean;
+  require_waiter_approval: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -48,7 +49,8 @@ export type RestaurantFeatureToggle =
   | 'require_table_assignment'
   | 'enable_customer_name'
   | 'enable_customer_mobile'
-  | 'enable_loyalty_pass';
+  | 'enable_loyalty_pass'
+  | 'require_waiter_approval';
 
 export type Customer = {
   id: string;
@@ -98,6 +100,8 @@ export type RestaurantMember = {
   is_active: boolean;
   display_name: string | null;
   phone: string | null;
+  can_take_orders: boolean;
+  can_handle_billing: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -367,6 +371,8 @@ export type RestaurantStaffRow = {
   email: string;
   created_at: string;
   availability: WaiterAvailability | null;
+  can_take_orders: boolean;
+  can_handle_billing: boolean;
 };
 
 export type RestaurantStats = {
@@ -493,6 +499,7 @@ export type Database = {
           p_enable_customer_name?: boolean | null;
           p_enable_customer_mobile?: boolean | null;
           p_enable_loyalty_pass?: boolean | null;
+          p_require_waiter_approval?: boolean | null;
         };
         Returns: void;
       };

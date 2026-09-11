@@ -18,8 +18,27 @@ import type {
   OrderStatus,
   PromotionalBanner,
   LoyaltySettings,
+  StaffShift,
 } from '@/types/database';
 import { fallbackLoyaltySettings } from '@/lib/customer/loyalty';
+
+// The shift-gate check for /waiter and /kitchen (and any server action taking
+// an order or updating an order's status) — a member with no open row here
+// has not clocked in yet.
+export async function getOpenShift(memberId: string): Promise<StaffShift | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('staff_shifts')
+    .select('*')
+    .eq('staff_id', memberId)
+    .is('clock_out_time', null)
+    .maybeSingle();
+  if (error) {
+    console.error('getOpenShift failed', error);
+    throw new Error('Could not check shift status.');
+  }
+  return data;
+}
 
 export async function getRestaurantById(id: string): Promise<Restaurant | null> {
   const supabase = createClient();

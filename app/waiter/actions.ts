@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import { getOpenShift } from '@/lib/restaurant/queries';
 import type { OrderLineInput } from '@/types/database';
 
 const OrderSchema = z.object({
@@ -31,6 +32,14 @@ export async function createWaiterOrder(input: WaiterOrderInput): Promise<Waiter
   const ctx = await requireRole(['waiter', 'manager', 'owner']);
   const restaurantId = ctx.tenantMembership?.restaurant.id;
   if (!restaurantId) return { orderNumber: null, error: 'No restaurant membership found.' };
+
+  // Same gate as the /waiter layout, re-checked here because this is the
+  // action that actually places the order — a waiter cannot bypass the
+  // shift requirement by calling it directly.
+  if (ctx.tenantMembership!.role === 'waiter') {
+    const openShift = await getOpenShift(ctx.tenantMembership!.id);
+    if (!openShift) return { orderNumber: null, error: 'Clock in to start taking orders.' };
+  }
 
   const parsed = OrderSchema.safeParse(input);
   if (!parsed.success) {

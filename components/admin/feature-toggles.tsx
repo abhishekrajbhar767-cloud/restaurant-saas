@@ -23,6 +23,12 @@ const TOGGLES: { setting: SettingsToggle; label: string; description: string }[]
     label: 'Ask for the customer’s mobile number',
     description: 'Shows a mobile number field before the customer places their order.',
   },
+  {
+    setting: 'require_waiter_approval',
+    label: 'Require waiter approval for orders',
+    description:
+      'New QR orders wait for a waiter to approve them before they reach the kitchen. Leave off to send orders straight through.',
+  },
 ];
 
 export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
@@ -30,6 +36,7 @@ export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
     require_table_assignment: restaurant.require_table_assignment,
     enable_customer_name: restaurant.enable_customer_name,
     enable_customer_mobile: restaurant.enable_customer_mobile,
+    require_waiter_approval: restaurant.require_waiter_approval,
   });
   const [pending, setPending] = useState<SettingsToggle | null>(null);
   const [error, setError] = useState<string | null>(null);

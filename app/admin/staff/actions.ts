@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { MemberRole } from '@/types/database';
+import type { MemberRole, RestaurantMember } from '@/types/database';
 
 async function requireTenant() {
   const ctx = await requireRole(['owner', 'manager']);
@@ -77,4 +77,25 @@ export async function setStaffActive(memberId: string, isActive: boolean) {
   if (error) throw new Error('Could not update that staff member — you may not have permission.');
 
   revalidatePath('/admin/staff');
+}
+
+// Individual capability flags. Only the one that changed is sent, matching the
+// same RLS scoping as setStaffActive (owner: anyone; manager: kitchen/waiter).
+export async function setStaffPermission(
+  memberId: string,
+  permission: 'can_take_orders' | 'can_handle_billing',
+  enabled: boolean
+): Promise<{ error: string | null }> {
+  await requireTenant();
+  const supabase = createClient();
+  const patch: Partial<Pick<RestaurantMember, 'can_take_orders' | 'can_handle_billing'>> = {
+    [permission]: enabled,
+  };
+  const { error } = await supabase.from('restaurant_members').update(patch).eq('id', memberId);
+  if (error) {
+    return { error: 'Could not update that permission — you may not have permission.' };
+  }
+
+  revalidatePath('/admin/staff');
+  return { error: null };
 }

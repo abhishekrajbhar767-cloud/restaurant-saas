@@ -22,6 +22,7 @@ export function ShiftClock({
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [toast, setToast] = useState<string | null>(null);
 
   const geofenced = restaurant.latitude !== null && restaurant.longitude !== null;
   const radius = restaurant.geofence_radius_meters ?? 0;
@@ -31,6 +32,12 @@ export function ShiftClock({
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [openShift]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   async function handleClockIn() {
     setBusy(true);
@@ -79,6 +86,7 @@ export function ShiftClock({
       setError(actionError);
       return;
     }
+    setToast(coords ? 'Shift started — location recorded.' : 'Shift started.');
     router.refresh();
   }
 
@@ -95,6 +103,7 @@ export function ShiftClock({
       setError(actionError);
       return;
     }
+    setToast('Shift ended.');
     router.refresh();
   }
 
@@ -149,7 +158,9 @@ export function ShiftClock({
             </button>
 
             {geofenced && (
-              <p className="mt-2 text-[11px] text-text-muted">Your browser will ask for location permission.</p>
+              <p className="mt-2 text-[11px] text-text-muted">
+                Clock-in will ask for location while you use the app, then read your GPS position.
+              </p>
             )}
           </>
         )}
@@ -172,6 +183,15 @@ export function ShiftClock({
             ))}
           </ul>
         </section>
+      )}
+
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-paper px-4 py-2 text-sm font-medium text-text-onPaper shadow-xl"
+        >
+          {toast}
+        </div>
       )}
     </div>
   );
