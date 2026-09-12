@@ -1,7 +1,10 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { ChefHat, CheckCircle2 } from 'lucide-react';
+import { RecipeMappingModal } from '@/components/admin/menu/recipe-mapping-modal';
 import {
   addCategory,
   renameCategory,
@@ -22,8 +25,26 @@ const FOOD_TYPE_DOT: Record<FoodType, string> = {
   non_veg: 'bg-danger',
 };
 
-export function MenuManager({ categories, items }: { categories: MenuCategory[]; items: MenuItem[] }) {
+export function MenuManager({ categories, items, restaurantId, inventoryEnabled }: {
+  categories: MenuCategory[];
+  items: MenuItem[];
+  restaurantId: string;
+  inventoryEnabled: boolean;
+}) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [recipeItem, setRecipeItem] = useState<MenuItem | null>(null);
+  const [recipeMessage, setRecipeMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!recipeMessage) return;
+    const timer = setTimeout(() => setRecipeMessage(null), 6000);
+    return () => clearTimeout(timer);
+  }, [recipeMessage]);
+
+  useEffect(() => {
+    if (!inventoryEnabled) setRecipeItem(null);
+  }, [inventoryEnabled]);
 
   return (
     <div className="space-y-6">
@@ -44,10 +65,29 @@ export function MenuManager({ categories, items }: { categories: MenuCategory[];
             isFirst={i === 0}
             isLast={i === categories.length - 1}
             onError={setError}
+            onRecipe={inventoryEnabled ? setRecipeItem : undefined}
           />
         ))}
         {categories.length === 0 && <p className="text-sm text-text-muted">No categories yet — add one above to get started.</p>}
       </div>
+      {inventoryEnabled && recipeItem && (
+        <RecipeMappingModal
+          key={recipeItem.id}
+          menuItem={recipeItem}
+          restaurantId={restaurantId}
+          onClose={() => setRecipeItem(null)}
+          onSaved={() => {
+            setRecipeMessage(`Recipe saved for ${recipeItem.name}.`);
+            setRecipeItem(null);
+            router.refresh();
+          }}
+        />
+      )}
+      {recipeMessage && (
+        <div role="status" className="fixed bottom-6 left-1/2 z-50 flex w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-lg border border-success/40 bg-ink-900 px-4 py-3 text-sm text-success shadow-panel">
+          <CheckCircle2 size={18} className="shrink-0" aria-hidden="true" />{recipeMessage}
+        </div>
+      )}
     </div>
   );
 }
@@ -86,12 +126,14 @@ function CategorySection({
   isFirst,
   isLast,
   onError,
+  onRecipe,
 }: {
   category: MenuCategory;
   items: MenuItem[];
   isFirst: boolean;
   isLast: boolean;
   onError: (e: string | null) => void;
+  onRecipe?: (item: MenuItem) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [renaming, setRenaming] = useState(false);
@@ -148,7 +190,7 @@ function CategorySection({
 
       <div className="mt-4 divide-y divide-line">
         {items.map((item, i) => (
-          <ItemRow key={item.id} item={item} isFirst={i === 0} isLast={i === items.length - 1} onError={onError} />
+          <ItemRow key={item.id} item={item} isFirst={i === 0} isLast={i === items.length - 1} onError={onError} onRecipe={onRecipe} />
         ))}
         {items.length === 0 && <p className="text-sm text-text-muted py-3">No items in this category yet.</p>}
       </div>
@@ -196,7 +238,13 @@ function RenameCategoryForm({ category, onDone, onError }: { category: MenuCateg
   );
 }
 
-function ItemRow({ item, isFirst, isLast, onError }: { item: MenuItem; isFirst: boolean; isLast: boolean; onError: (e: string | null) => void }) {
+function ItemRow({ item, isFirst, isLast, onError, onRecipe }: {
+  item: MenuItem;
+  isFirst: boolean;
+  isLast: boolean;
+  onError: (e: string | null) => void;
+  onRecipe?: (item: MenuItem) => void;
+}) {
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
 
@@ -247,6 +295,11 @@ function ItemRow({ item, isFirst, isLast, onError }: { item: MenuItem; isFirst: 
         <button onClick={() => setEditing(true)} className="underline underline-offset-2 text-text-muted hover:text-text">
           Edit
         </button>
+        {onRecipe && (
+          <button type="button" onClick={() => onRecipe(item)} aria-label={`Recipe for ${item.name}`} className="inline-flex items-center gap-1 text-amber hover:text-amber-bright">
+            <ChefHat size={15} aria-hidden="true" />Recipe
+          </button>
+        )}
         <button
           onClick={() => run(() => setItemAvailable(item.id, !item.is_available))}
           disabled={isPending}

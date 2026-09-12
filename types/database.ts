@@ -491,6 +491,11 @@ export type Database = {
       inventory_logs: { Row: InventoryLog; Insert: Partial<InventoryLog>; Update: Partial<InventoryLog>; Relationships: [] };
     };
     Functions: {
+      save_menu_item_recipe: {
+        Args: { p_menu_item_id: string; p_ingredients: { inventory_item_id: string; quantity_required: number }[] };
+        Returns: void;
+      };
+      delete_recipe_ingredient: { Args: { p_recipe_id: string }; Returns: void };
       add_inventory_stock: {
         Args: { p_inventory_item_id: string; p_quantity: number; p_notes?: string | null };
         Returns: InventoryItem;

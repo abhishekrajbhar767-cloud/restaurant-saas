@@ -15,7 +15,12 @@ export default async function MenuPage() {
         <p className="text-sm text-text-muted">Categories, items, prices, and photos — changes go live immediately.</p>
       </div>
 
-      <MenuManager categories={categories} items={items} />
+      <MenuManager
+        categories={categories}
+        items={items}
+        restaurantId={restaurant.id}
+        inventoryEnabled={restaurant.inventory_tracking_enabled}
+      />
     </div>
   );
 }

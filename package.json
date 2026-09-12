@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:inventory": "node --test scripts/inventory.test.mjs",
+    "test:recipes": "node --test scripts/recipes.test.mjs",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android"
   },
