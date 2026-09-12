@@ -29,6 +29,8 @@ export type ServiceRequestStatus = 'pending' | 'claimed' | 'resolved' | 'cancell
 export type WaiterAvailability = 'free' | 'busy' | 'offline';
 export type TableStatus = 'empty' | 'dining' | 'billed';
 export type SessionEndReason = 'service' | 'eod_reset';
+export type InventoryUnit = 'kg' | 'gram' | 'litre' | 'ml' | 'pcs';
+export type InventoryChangeType = 'manual_restock' | 'auto_deduct' | 'waste' | 'correction';
 
 export type Restaurant = {
   id: string;
@@ -47,6 +49,8 @@ export type Restaurant = {
   enable_customer_mobile: boolean;
   enable_loyalty_pass: boolean;
   require_waiter_approval: boolean;
+  inventory_tracking_enabled: boolean;
+  recipe_auto_deduct_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -58,7 +62,9 @@ export type RestaurantFeatureToggle =
   | 'enable_customer_name'
   | 'enable_customer_mobile'
   | 'enable_loyalty_pass'
-  | 'require_waiter_approval';
+  | 'require_waiter_approval'
+  | 'inventory_tracking_enabled'
+  | 'recipe_auto_deduct_enabled';
 
 export type Customer = {
   id: string;
@@ -168,6 +174,38 @@ export type MenuItem = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+};
+
+// Inventory & Recipes (phase 1 — schema and toggles only; no deduction logic
+// or UI reads this yet).
+export type InventoryItem = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  unit: InventoryUnit;
+  current_stock: number;
+  min_alert_limit: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MenuItemRecipe = {
+  id: string;
+  restaurant_id: string;
+  menu_item_id: string;
+  inventory_item_id: string;
+  quantity_required: number;
+};
+
+export type InventoryLog = {
+  id: string;
+  restaurant_id: string;
+  inventory_item_id: string;
+  change_type: InventoryChangeType;
+  quantity: number;
+  notes: string | null;
+  performed_by: string | null;
+  created_at: string;
 };
 
 export type Order = {
@@ -448,6 +486,9 @@ export type Database = {
       loyalty_settings: { Row: LoyaltySettings; Insert: Partial<LoyaltySettings>; Update: Partial<LoyaltySettings>; Relationships: [] };
       subscriptions: { Row: Subscription; Insert: Partial<Subscription>; Update: Partial<Subscription>; Relationships: [] };
       staff_push_tokens: { Row: StaffPushToken; Insert: Partial<StaffPushToken>; Update: Partial<StaffPushToken>; Relationships: [] };
+      inventory_items: { Row: InventoryItem; Insert: Partial<InventoryItem>; Update: Partial<InventoryItem>; Relationships: [] };
+      menu_item_recipes: { Row: MenuItemRecipe; Insert: Partial<MenuItemRecipe>; Update: Partial<MenuItemRecipe>; Relationships: [] };
+      inventory_logs: { Row: InventoryLog; Insert: Partial<InventoryLog>; Update: Partial<InventoryLog>; Relationships: [] };
     };
     Functions: {
       create_order: {
@@ -527,6 +568,8 @@ export type Database = {
           p_enable_customer_mobile?: boolean | null;
           p_enable_loyalty_pass?: boolean | null;
           p_require_waiter_approval?: boolean | null;
+          p_inventory_tracking_enabled?: boolean | null;
+          p_recipe_auto_deduct_enabled?: boolean | null;
         };
         Returns: void;
       };

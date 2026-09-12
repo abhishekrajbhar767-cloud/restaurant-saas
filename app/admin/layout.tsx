@@ -27,7 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen">
       <StaffTopbar area="Admin" restaurantName={restaurant.name} restaurantSlug={restaurant.slug} />
       {restaurant.status === 'suspended' && <SuspendedBanner />}
-      <AdminNav canManage={canManage} />
+      <AdminNav canManage={canManage} inventoryEnabled={restaurant.inventory_tracking_enabled} />
       <main className="p-6 max-w-6xl mx-auto">{children}</main>
     </div>
   );

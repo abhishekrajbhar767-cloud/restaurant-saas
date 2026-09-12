@@ -29,6 +29,16 @@ const TOGGLES: { setting: SettingsToggle; label: string; description: string }[]
     description:
       'New QR orders wait for a waiter to approve them before they reach the kitchen. Leave off to send orders straight through.',
   },
+  {
+    setting: 'inventory_tracking_enabled',
+    label: 'Raw Inventory Tracking',
+    description: 'Track stock levels for raw ingredients and get low-stock alerts.',
+  },
+  {
+    setting: 'recipe_auto_deduct_enabled',
+    label: 'Auto-Deduct Stock on Order Dispatch',
+    description: 'Deduct ingredient quantities from stock automatically as orders go out. Requires inventory tracking.',
+  },
 ];
 
 export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
@@ -37,6 +47,8 @@ export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
     enable_customer_name: restaurant.enable_customer_name,
     enable_customer_mobile: restaurant.enable_customer_mobile,
     require_waiter_approval: restaurant.require_waiter_approval,
+    inventory_tracking_enabled: restaurant.inventory_tracking_enabled,
+    recipe_auto_deduct_enabled: restaurant.recipe_auto_deduct_enabled,
   });
   const [pending, setPending] = useState<SettingsToggle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,19 +56,33 @@ export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
 
   function handleToggle(setting: SettingsToggle) {
     if (pending) return;
+    if (setting === 'recipe_auto_deduct_enabled' && !values.inventory_tracking_enabled) return;
 
     const next = !values[setting];
     const previous = values[setting];
+    const previousAutoDeduct = values.recipe_auto_deduct_enabled;
+    // Auto-deduct is meaningless without inventory tracking — the RPC
+    // cascades this server-side too, so this just keeps the switch from
+    // flashing "on" for a moment before the page catches up.
+    const alsoTurningOffAutoDeduct = setting === 'inventory_tracking_enabled' && !next;
 
     setError(null);
     setPending(setting);
-    setValues((prev) => ({ ...prev, [setting]: next }));
+    setValues((prev) => ({
+      ...prev,
+      [setting]: next,
+      ...(alsoTurningOffAutoDeduct ? { recipe_auto_deduct_enabled: false } : {}),
+    }));
 
     startTransition(async () => {
       const { error: saveError } = await setFeatureToggle(setting, next);
       setPending(null);
       if (saveError) {
-        setValues((prev) => ({ ...prev, [setting]: previous }));
+        setValues((prev) => ({
+          ...prev,
+          [setting]: previous,
+          ...(alsoTurningOffAutoDeduct ? { recipe_auto_deduct_enabled: previousAutoDeduct } : {}),
+        }));
         setError(saveError);
       }
     });
@@ -81,12 +107,16 @@ export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
         {TOGGLES.map((toggle) => {
           const on = values[toggle.setting];
           const busy = pending === toggle.setting;
+          const locked = toggle.setting === 'recipe_auto_deduct_enabled' && !values.inventory_tracking_enabled;
 
           return (
-            <li key={toggle.setting} className={`flex items-start gap-4 py-3 ${busy ? 'opacity-60' : ''}`}>
+            <li key={toggle.setting} className={`flex items-start gap-4 py-3 ${busy ? 'opacity-60' : ''} ${locked ? 'opacity-50' : ''}`}>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{toggle.label}</p>
-                <p className="mt-0.5 text-xs text-text-muted">{toggle.description}</p>
+                <p className="mt-0.5 text-xs text-text-muted">
+                  {toggle.description}
+                  {locked && ' Turn on Raw Inventory Tracking first.'}
+                </p>
               </div>
 
               <span
@@ -102,7 +132,7 @@ export function FeatureToggles({ restaurant }: { restaurant: Restaurant }) {
                 role="switch"
                 aria-checked={on}
                 aria-label={toggle.label}
-                disabled={pending !== null}
+                disabled={pending !== null || locked}
                 onClick={() => handleToggle(toggle.setting)}
                 className={`relative mt-0.5 inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:pointer-events-none ${
                   on ? 'border-success/60 bg-success/70' : 'border-line bg-ink-700'
