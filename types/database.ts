@@ -491,6 +491,10 @@ export type Database = {
       inventory_logs: { Row: InventoryLog; Insert: Partial<InventoryLog>; Update: Partial<InventoryLog>; Relationships: [] };
     };
     Functions: {
+      add_inventory_stock: {
+        Args: { p_inventory_item_id: string; p_quantity: number; p_notes?: string | null };
+        Returns: InventoryItem;
+      };
       create_order: {
         Args: {
           p_qr_token: string;
