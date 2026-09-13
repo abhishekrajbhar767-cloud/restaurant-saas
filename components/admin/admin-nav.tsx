@@ -1,7 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import type { InventoryItem } from '@/types/database';
 
 const TABS = [
   { href: '/admin', label: 'Dashboard' },
@@ -20,8 +23,36 @@ const TABS = [
 // restaurant's inventory_tracking_enabled toggle just hides the tab when the
 // feature is off; a route or RPC under /admin/inventory (phase 2) is what
 // actually has to check it.
-export function AdminNav({ canManage, inventoryEnabled }: { canManage: boolean; inventoryEnabled: boolean }) {
+export function AdminNav({ canManage, inventoryEnabled, restaurantId, initialLowStockCount }: {
+  canManage: boolean;
+  inventoryEnabled: boolean;
+  restaurantId: string;
+  initialLowStockCount: number;
+}) {
   const pathname = usePathname();
+  const [lowStockCount, setLowStockCount] = useState(initialLowStockCount);
+
+  useEffect(() => setLowStockCount(initialLowStockCount), [initialLowStockCount]);
+
+  useEffect(() => {
+    if (!inventoryEnabled) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`admin-inventory-alert-${restaurantId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory_items', filter: `restaurant_id=eq.${restaurantId}` },
+        (payload) => {
+          // Recount after any stock/create/delete event. This also stays correct
+          // if an ingredient's alert limit changes in a future phase.
+          void supabase.rpc('get_low_stock_count', { p_restaurant_id: restaurantId }).then(({ data, error }) => {
+            if (!error && typeof data === 'number') setLowStockCount(data);
+          });
+        }
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [inventoryEnabled, restaurantId]);
 
   return (
     <nav className="border-b border-line bg-ink-900 px-6 flex gap-1" aria-label="Admin sections">
@@ -35,7 +66,18 @@ export function AdminNav({ canManage, inventoryEnabled }: { canManage: boolean; 
               active ? 'border-amber text-amber' : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-1.5">
+              {tab.label}
+              {tab.inventoryOnly && lowStockCount > 0 && (
+                <span
+                  aria-label={`${lowStockCount} low-stock ingredient${lowStockCount === 1 ? '' : 's'}`}
+                  title={`${lowStockCount} low-stock ingredient${lowStockCount === 1 ? '' : 's'}`}
+                  className="inline-flex min-w-5 items-center justify-center rounded-full bg-danger px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none text-white"
+                >
+                  {lowStockCount > 99 ? '99+' : lowStockCount}
+                </span>
+              )}
+            </span>
           </Link>
         );
       })}

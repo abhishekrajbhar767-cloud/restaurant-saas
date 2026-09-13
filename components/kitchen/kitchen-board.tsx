@@ -7,15 +7,22 @@ import { dispatchKitchenReadyAlert } from '@/app/waiter/push-actions';
 import { OrderTicket } from '@/components/kitchen/order-ticket';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
 import { releaseWakeLock, requestWakeLock } from '@/lib/shared/wake-lock';
-import type { OrderWithItems, Order } from '@/types/database';
+import type { OrderWithItems, Order, Restaurant } from '@/types/database';
 
 // 1s buzz, 0.5s rest, twice — refired every 3s by the interval below.
 const VIBRATE_PATTERN: number[] = [1000, 500, 1000, 500];
 
-export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: string; initialOrders: OrderWithItems[] }) {
+export function KitchenBoard({ restaurantId, initialOrders, initialAutoDeductEnabled }: {
+  restaurantId: string;
+  initialOrders: OrderWithItems[];
+  initialAutoDeductEnabled: boolean;
+}) {
   const [orders, setOrders] = useState<OrderWithItems[]>(initialOrders);
   const [shiftActive, setShiftActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoDeductEnabled, setAutoDeductEnabled] = useState(initialAutoDeductEnabled);
+
+  useEffect(() => { setAutoDeductEnabled(initialAutoDeductEnabled); }, [initialAutoDeductEnabled]);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const vibrateTimerRef = useRef<number | null>(null);
@@ -63,6 +70,14 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
 
     const channel = supabase
       .channel(`kds-${restaurantId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'restaurants', filter: `id=eq.${restaurantId}` },
+        (payload) => {
+          const restaurant = payload.new as Restaurant;
+          setAutoDeductEnabled(restaurant.inventory_tracking_enabled && restaurant.recipe_auto_deduct_enabled);
+        }
+      )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
@@ -178,7 +193,7 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
     if (!current || current.status !== 'placed' || transitioningRef.current.has(orderId)) return; // already accepted / in flight
     transitioningRef.current.add(orderId);
 
-    const { error } = await acceptOrder(orderId, minutes);
+    const { error } = await acceptOrder(orderId, minutes, autoDeductEnabled);
     transitioningRef.current.delete(orderId);
     if (error) {
       setError(error);
@@ -202,7 +217,7 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
     if (!current || (current.status !== 'accepted' && current.status !== 'preparing') || transitioningRef.current.has(orderId)) return;
     transitioningRef.current.add(orderId);
 
-    const { error } = await markReady(orderId);
+    const { error } = await markReady(orderId, autoDeductEnabled);
     transitioningRef.current.delete(orderId);
     if (error) {
       setError(error);
@@ -217,7 +232,7 @@ export function KitchenBoard({ restaurantId, initialOrders }: { restaurantId: st
     if (!current || current.status !== 'ready' || transitioningRef.current.has(orderId)) return;
     transitioningRef.current.add(orderId);
 
-    const { error } = await markServed(orderId);
+    const { error } = await markServed(orderId, autoDeductEnabled);
     transitioningRef.current.delete(orderId);
     if (error) {
       setError(error);

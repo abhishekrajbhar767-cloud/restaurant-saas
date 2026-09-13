@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test:inventory": "node --test scripts/inventory.test.mjs",
     "test:recipes": "node --test scripts/recipes.test.mjs",
+    "test:auto-deduction": "node --test scripts/auto-deduction.test.mjs",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android"
   },

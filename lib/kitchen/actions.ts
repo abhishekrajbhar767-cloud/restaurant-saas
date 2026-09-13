@@ -8,8 +8,9 @@
 // rejected RPC call just surfaces its error to the caller.
 
 import { createClient } from '@/lib/supabase/client';
+import { scheduleInventoryDeduction } from '@/lib/kitchen/inventory';
 
-export async function acceptOrder(orderId: string, estimatedMinutes: number): Promise<{ error: string | null }> {
+export async function acceptOrder(orderId: string, estimatedMinutes: number, autoDeductEnabled = false): Promise<{ error: string | null }> {
   const supabase = createClient();
 
   const { error: acceptError } = await supabase.rpc('kitchen_accept_order', {
@@ -27,18 +28,21 @@ export async function acceptOrder(orderId: string, estimatedMinutes: number): Pr
   });
   if (prepareError) return { error: prepareError.message };
 
+  scheduleInventoryDeduction(orderId, autoDeductEnabled);
   return { error: null };
 }
 
-export async function markReady(orderId: string): Promise<{ error: string | null }> {
+export async function markReady(orderId: string, autoDeductEnabled = false): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.rpc('update_order_status', { p_order_id: orderId, p_new_status: 'ready' });
+  if (!error) scheduleInventoryDeduction(orderId, autoDeductEnabled);
   return { error: error?.message ?? null };
 }
 
-export async function markServed(orderId: string): Promise<{ error: string | null }> {
+export async function markServed(orderId: string, autoDeductEnabled = false): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.rpc('update_order_status', { p_order_id: orderId, p_new_status: 'served' });
+  if (!error) scheduleInventoryDeduction(orderId, autoDeductEnabled);
   return { error: error?.message ?? null };
 }
 

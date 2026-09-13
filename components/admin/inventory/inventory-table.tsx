@@ -54,8 +54,8 @@ export function InventoryTable({ items: initialItems, timeZone }: { items: Inven
             <tbody className="divide-y divide-line">
               {items.map((item) => {
                 const low = item.current_stock <= item.min_alert_limit;
-                return <tr key={item.id} className="hover:bg-ink-800/40">
-                  <th scope="row" className="min-w-[10rem] break-words px-4 py-4 font-medium">{item.name}</th>
+                return <tr key={item.id} className={low ? 'bg-amber/[0.07] hover:bg-amber/[0.11]' : 'hover:bg-ink-800/40'}>
+                  <th scope="row" className={`min-w-[10rem] break-words border-l-2 px-4 py-4 font-medium ${low ? 'border-amber text-amber-bright' : 'border-transparent'}`}>{item.name}</th>
                   <td className="px-4 py-4 text-text-muted">{item.unit}</td>
                   <td className="px-4 py-4 font-mono tabular-nums">{formatStock(item.current_stock)}</td>
                   <td className="px-4 py-4 font-mono tabular-nums text-text-muted">{formatStock(item.min_alert_limit)}</td>

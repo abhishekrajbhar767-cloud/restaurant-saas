@@ -210,6 +210,7 @@ export type InventoryLog = {
 
 export type Order = {
   id: string;
+  inventory_deducted: boolean;
   restaurant_id: string;
   table_id: string;
   order_number: number;
@@ -491,6 +492,8 @@ export type Database = {
       inventory_logs: { Row: InventoryLog; Insert: Partial<InventoryLog>; Update: Partial<InventoryLog>; Relationships: [] };
     };
     Functions: {
+      deduct_order_inventory: { Args: { p_order_id: string }; Returns: void };
+      get_low_stock_count: { Args: { p_restaurant_id: string }; Returns: number };
       save_menu_item_recipe: {
         Args: { p_menu_item_id: string; p_ingredients: { inventory_item_id: string; quantity_required: number }[] };
         Returns: void;

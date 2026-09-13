@@ -21,5 +21,9 @@ export default async function KitchenPage() {
     table_number: o.tables?.table_number ?? '\u2014',
   }));
 
-  return <KitchenBoard restaurantId={restaurant.id} initialOrders={initialOrders} />;
+  return <KitchenBoard
+    restaurantId={restaurant.id}
+    initialOrders={initialOrders}
+    initialAutoDeductEnabled={restaurant.inventory_tracking_enabled && restaurant.recipe_auto_deduct_enabled}
+  />;
 }

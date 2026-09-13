@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth/session';
 import { StaffTopbar } from '@/components/shared/staff-topbar';
 import { SuspendedBanner } from '@/components/shared/suspended-banner';
 import { AdminNav } from '@/components/admin/admin-nav';
+import { createClient } from '@/lib/supabase/server';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireRole(['owner', 'manager']);
@@ -23,11 +24,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
+  let lowStockCount = 0;
+  if (restaurant.inventory_tracking_enabled) {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('get_low_stock_count', { p_restaurant_id: restaurant.id });
+    if (!error && typeof data === 'number') lowStockCount = data;
+  }
+
   return (
     <div className="min-h-screen">
       <StaffTopbar area="Admin" restaurantName={restaurant.name} restaurantSlug={restaurant.slug} />
       {restaurant.status === 'suspended' && <SuspendedBanner />}
-      <AdminNav canManage={canManage} inventoryEnabled={restaurant.inventory_tracking_enabled} />
+      <AdminNav
+        canManage={canManage}
+        inventoryEnabled={restaurant.inventory_tracking_enabled}
+        restaurantId={restaurant.id}
+        initialLowStockCount={lowStockCount}
+      />
       <main className="p-6 max-w-6xl mx-auto">{children}</main>
     </div>
   );
