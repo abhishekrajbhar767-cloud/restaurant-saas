@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { allSatisfied, checkRequiredPermissions } from '@/lib/native/device-permissions';
 
 // Paths that must stay reachable even while permissions are missing:
@@ -63,6 +64,40 @@ export function PermissionsRouteGuard({ children }: { children: React.ReactNode 
       cancelled = true;
     };
   }, [gated, pathname, router]);
+
+  // A permission can be revoked in Android settings while this WebView stays
+  // alive. Re-check whenever the app returns to the foreground so the
+  // in-memory launch result cannot become a bypass.
+  useEffect(() => {
+    if (!native) return;
+
+    let disposed = false;
+    const listener = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) return;
+
+      void (async () => {
+        const snapshots = await checkRequiredPermissions();
+        if (disposed) return;
+
+        if (allSatisfied(snapshots)) {
+          verifiedThisLaunch = true;
+          if (gated) setAllowed(true);
+          return;
+        }
+
+        verifiedThisLaunch = false;
+        if (gated) {
+          setAllowed(false);
+          router.replace('/permissions');
+        }
+      })();
+    });
+
+    return () => {
+      disposed = true;
+      void listener.then((handle) => handle.remove());
+    };
+  }, [gated, native, router]);
 
   if (!allowed) {
     return (

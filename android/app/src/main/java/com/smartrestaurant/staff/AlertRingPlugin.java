@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -152,8 +151,11 @@ public class AlertRingPlugin extends Plugin {
     }
 
     private boolean hasLocationPermission() {
-        if (getPermissionState("location") == PermissionState.GRANTED) return true;
-        return getContext().checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+        // A geofence must not be treated as ready when Android has only
+        // granted approximate (coarse) location. Capacitor's alias contains
+        // both permissions, but checking FINE explicitly also keeps this
+        // strict on OEM builds that report a partially-granted alias.
+        return getContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
             == android.content.pm.PackageManager.PERMISSION_GRANTED;
     }
 
@@ -176,11 +178,36 @@ public class AlertRingPlugin extends Plugin {
 
     private boolean openBatteryOptimizationSettings() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
-        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-        intent.setData(Uri.parse("package:" + getContext().getPackageName()));
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        getContext().startActivity(intent);
-        return true;
+        try {
+            Intent directRequest = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            directRequest.setData(Uri.parse("package:" + getContext().getPackageName()));
+            directRequest.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(directRequest);
+            return true;
+        } catch (Exception ignored) {
+            // MIUI/FuntouchOS and a few other ROMs do not expose the direct
+            // per-app request activity. Fall back to the battery allow-list.
+        }
+
+        try {
+            Intent batteryList = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            batteryList.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(batteryList);
+            return true;
+        } catch (Exception ignored) {
+            // Last resort: the app details page still gives the user a route
+            // to the OEM-specific battery/background-use controls.
+        }
+
+        try {
+            Intent appDetails = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            appDetails.setData(Uri.parse("package:" + getContext().getPackageName()));
+            appDetails.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(appDetails);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private boolean openOverlaySettings() {

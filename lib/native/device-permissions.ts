@@ -3,7 +3,7 @@
 // The actual OS/browser permission state, read fresh every time — nothing
 // here is cached in localStorage. A staff member who reinstalls the app or
 // clears site data loses their OS grants, and the next mount of
-// AppPermissionsGate has to see that immediately, not trust a stale flag.
+// PermissionsRouteGuard has to see that immediately, not trust a stale flag.
 //
 // Status is checked via the Web Permissions API wherever it's available —
 // Capacitor's Android WebView is Chromium-based, so navigator.permissions
@@ -53,17 +53,19 @@ async function queryWebPermission(kind: PermissionKind): Promise<PermissionState
 }
 
 async function checkLocation(): Promise<PermissionState> {
-  const web = await queryWebPermission('location');
-  if (web) return web;
-
   if (Capacitor.isNativePlatform()) {
     try {
       const status = await AlertRing.checkAlertPermissions();
       return status.location ? 'granted' : 'prompt';
     } catch {
-      return 'unsupported';
+      // Required native checks fail closed. A temporarily unavailable bridge
+      // must never let a staff member bypass the gate.
+      return 'prompt';
     }
   }
+
+  const web = await queryWebPermission('location');
+  if (web) return web;
 
   if (typeof navigator === 'undefined' || !navigator.geolocation) return 'unsupported';
   return 'prompt';
@@ -74,11 +76,11 @@ async function requestLocation(): Promise<PermissionState> {
     try {
       const result = await AlertRing.requestLocationPermissions();
       if (result.granted) return 'granted';
-      // The native plugin only returns a boolean, so re-check through the
-      // Web Permissions API (if this WebView supports it) to tell a real
-      // "permanently denied" apart from "dismissed the dialog this time".
-      const web = await queryWebPermission('location');
-      return web ?? 'denied';
+      // Do not trust the WebView's geolocation result here: on Android 12+
+      // it can report "granted" when the user allowed approximate location,
+      // while the native geofence still lacks precise access. The next tap
+      // opens app settings, where precise location can be enabled explicitly.
+      return 'denied';
     } catch {
       return 'unsupported';
     }
@@ -127,7 +129,7 @@ async function checkNotifications(): Promise<PermissionState> {
       const status = await PushNotifications.checkPermissions();
       return mapPushState(status.receive);
     } catch {
-      return 'unsupported';
+      return 'prompt';
     }
   }
 
@@ -167,7 +169,7 @@ async function checkBattery(): Promise<PermissionState> {
     const status = await AlertRing.checkAlertPermissions();
     return status.batteryOptimizationsIgnored ? 'granted' : 'prompt';
   } catch {
-    return 'unsupported';
+    return 'prompt';
   }
 }
 
