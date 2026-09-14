@@ -113,6 +113,26 @@ public class AlertRingPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    // The permanently-denied escape hatch. Once Android stops showing a
+    // runtime prompt (two denials, or "Don't ask again" on an OEM skin), the
+    // only way back is the app's own details page in system Settings.
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        JSObject ret = new JSObject();
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            ret.put("opened", true);
+        } catch (Exception e) {
+            // Some heavily-skinned ROMs block or rename this screen. Report it
+            // rather than crashing so the UI can fall back to written steps.
+            ret.put("opened", false);
+        }
+        call.resolve(ret);
+    }
+
     @PluginMethod
     public void requestLocationPermissions(PluginCall call) {
         if (hasLocationPermission()) {

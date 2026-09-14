@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google';
+import { PermissionsRouteGuard } from '@/components/shared/permissions-route-guard';
 import './globals.css';
 
 const display = Space_Grotesk({ subsets: ['latin'], variable: '--font-display', weight: ['500', '700'] });
@@ -14,7 +15,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="font-body bg-ink-950 text-text min-h-screen antialiased">{children}</body>
+      <body className="font-body bg-ink-950 text-text min-h-screen antialiased">
+        <PermissionsRouteGuard>{children}</PermissionsRouteGuard>
+      </body>
     </html>
   );
 }

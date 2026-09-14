@@ -30,6 +30,8 @@ export interface AlertRingPlugin {
   requestFullScreenIntentPermission(): Promise<PermissionPromptResult>;
   requestCriticalPermissions(): Promise<{ opened: string }>;
   requestLocationPermissions(): Promise<{ granted: boolean }>;
+  /** Opens ACTION_APPLICATION_DETAILS_SETTINGS — the only route back from a permanently denied permission. */
+  openAppSettings(): Promise<{ opened: boolean }>;
 }
 
 const AlertRing = registerPlugin<AlertRingPlugin>('AlertRing', {

@@ -2,6 +2,7 @@ import { requireRole } from '@/lib/auth/session';
 import { StaffTopbar } from '@/components/shared/staff-topbar';
 import { SuspendedBanner } from '@/components/shared/suspended-banner';
 import { AdminNav } from '@/components/admin/admin-nav';
+import { AppPermissionsGate } from '@/components/shared/app-permissions-gate';
 import { createClient } from '@/lib/supabase/server';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +42,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         restaurantId={restaurant.id}
         initialLowStockCount={lowStockCount}
       />
-      <main className="p-6 max-w-6xl mx-auto">{children}</main>
+      <main className="p-6 max-w-6xl mx-auto">
+        <AppPermissionsGate>{children}</AppPermissionsGate>
+      </main>
     </div>
   );
 }

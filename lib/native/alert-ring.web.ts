@@ -45,4 +45,10 @@ export class AlertRingWeb extends WebPlugin implements AlertRingPlugin {
   async requestLocationPermissions(): Promise<{ granted: boolean }> {
     return { granted: true };
   }
+
+  async openAppSettings(): Promise<{ opened: boolean }> {
+    // No equivalent on the web — browser site settings are reached through
+    // the address bar, which a page cannot open for the user.
+    return { opened: false };
+  }
 }
