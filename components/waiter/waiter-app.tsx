@@ -6,6 +6,7 @@ import { RequestCard } from '@/components/waiter/request-card';
 import { NewOrderSheet } from '@/components/waiter/new-order-sheet';
 import { TableStatusBoard } from '@/components/waiter/table-status-board';
 import { OrderApprovalCard } from '@/components/waiter/order-approval-card';
+import { EditPendingOrderModal } from '@/components/waiter/edit-pending-order-modal';
 import { Capacitor } from '@capacitor/core';
 import { RINGTONE_SRC } from '@/lib/shared/ringtone';
 import { assignTableToSelf, setTableStatus } from '@/lib/shared/table-status';
@@ -60,6 +61,7 @@ export function WaiterApp({
   const [tables, setTables] = useState<RestaurantTable[]>(initialTables);
   const [pendingApprovals, setPendingApprovals] = useState<OrderWithItems[]>(initialPendingApprovals);
   const [approvalActionIds, setApprovalActionIds] = useState<ReadonlySet<string>>(new Set());
+  const [editingOrder, setEditingOrder] = useState<OrderWithItems | null>(null);
   const [pendingTableIds, setPendingTableIds] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const [togglePending, setTogglePending] = useState(false);
@@ -477,6 +479,19 @@ export function WaiterApp({
     setToast('Order rejected.');
   }
 
+  // edit_and_approve_waiter_order already committed by the time this fires —
+  // the modal only calls onSaved after a successful RPC response — so this
+  // just applies the result locally (drop it from the approval queue) and
+  // shows the confirmation. The order's own row + items refresh via the
+  // realtime subscriptions the customer tracker and any other open waiter
+  // screen already hold.
+  function handleOrderEdited(message: string) {
+    if (!editingOrder) return;
+    setPendingApprovals((prev) => prev.filter((o) => o.id !== editingOrder.id));
+    setEditingOrder(null);
+    setToast(message);
+  }
+
   async function handleAccept(requestId: string) {
     const supabase = createClient();
     const { data: claimed, error } = await supabase.rpc('claim_service_request', { p_request_id: requestId });
@@ -572,10 +587,22 @@ export function WaiterApp({
                 isPending={approvalActionIds.has(order.id)}
                 onApprove={() => handleApproveOrder(order.id)}
                 onReject={(reason) => handleRejectOrder(order.id, reason)}
+                onEdit={() => setEditingOrder(order)}
               />
             ))}
           </div>
         </section>
+      )}
+
+      {editingOrder && (
+        <EditPendingOrderModal
+          order={editingOrder}
+          categories={categories}
+          items={menuItems}
+          currency={currency}
+          onClose={() => setEditingOrder(null)}
+          onSaved={handleOrderEdited}
+        />
       )}
 
       <section>

@@ -526,6 +526,7 @@ export type Database = {
       transfer_table: { Args: { p_table_id: string; p_to_member_id: string }; Returns: void };
       approve_waiter_order: { Args: { p_order_id: string }; Returns: void };
       reject_waiter_order: { Args: { p_order_id: string; p_reason?: string | null }; Returns: void };
+      edit_and_approve_waiter_order: { Args: { p_order_id: string; p_lines: OrderLineInput[] }; Returns: void };
       auth_is_super_admin: { Args: Record<string, never>; Returns: boolean };
       subscription_effective_status: {
         Args: { p_plan_type: string; p_trial_ends_at: string | null; p_expires_at: string | null };

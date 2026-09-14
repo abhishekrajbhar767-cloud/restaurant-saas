@@ -9,11 +9,13 @@ export function OrderApprovalCard({
   isPending,
   onApprove,
   onReject,
+  onEdit,
 }: {
   order: OrderWithItems;
   isPending: boolean;
   onApprove: () => void;
   onReject: (reason: string) => void;
+  onEdit: () => void;
 }) {
   const elapsed = useElapsed(order.created_at);
   const [rejecting, setRejecting] = useState(false);
@@ -74,6 +76,13 @@ export function OrderApprovalCard({
           <div className="flex gap-2">
             <button onClick={onApprove} disabled={isPending} className="btn-primary flex-1 text-sm">
               {isPending ? 'Working…' : 'Approve'}
+            </button>
+            <button
+              onClick={onEdit}
+              disabled={isPending}
+              className="rounded border border-amber/50 px-3.5 py-2.5 text-sm font-display font-medium text-amber transition-colors hover:bg-amber/10 disabled:opacity-50"
+            >
+              Edit
             </button>
             <button
               onClick={() => setRejecting(true)}

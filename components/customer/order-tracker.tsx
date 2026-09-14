@@ -22,7 +22,7 @@ const STEP_LABEL: Record<OrderStatus, string> = {
 
 export function OrderTracker({
   initialOrder,
-  orderItems,
+  orderItems: initialOrderItems,
   restaurantName,
   currency,
   tableNumber,
@@ -46,6 +46,7 @@ export function OrderTracker({
   googleReviewUrl: string | null;
 }) {
   const [order, setOrder] = useState(initialOrder);
+  const [orderItems, setOrderItems] = useState(initialOrderItems);
   const [tableStatus, setTableStatus] = useState(initialTableStatus);
   const [now, setNow] = useState(() => Date.now());
 
@@ -58,6 +59,18 @@ export function OrderTracker({
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` }, (payload) => {
         setOrder(payload.new as Order);
       })
+      // A waiter editing a held order (edit_and_approve_waiter_order)
+      // deletes and re-inserts every line rather than patching one — a
+      // full refetch on any change is simpler and correct either way,
+      // whether it's that rewrite, a void, or a manager's discount.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${order.id}` },
+        async () => {
+          const { data } = await supabase.from('order_items').select('*').eq('order_id', order.id);
+          setOrderItems((data ?? []) as OrderItem[]);
+        }
+      )
       .subscribe();
 
     return () => {
