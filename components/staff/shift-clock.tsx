@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clockIn, clockOut } from '@/app/staff/actions';
-import { distanceMeters, formatDistance, getCurrentPosition } from '@/lib/shared/geolocation';
+import { distanceMeters, formatDistance, getVerifiedPosition } from '@/lib/shared/geolocation';
 import type { Restaurant, StaffShift } from '@/types/database';
 
 export function ShiftClock({
@@ -44,11 +44,11 @@ export function ShiftClock({
     setError(null);
     setStatus(null);
 
-    let coords: { latitude: number; longitude: number } | null = null;
+    let coords: { latitude: number; longitude: number; isMock?: boolean } | null = null;
 
     if (geofenced) {
       setStatus('Checking your location…');
-      const result = await getCurrentPosition();
+      const result = await getVerifiedPosition();
 
       if ('error' in result) {
         setError(result.error);
@@ -57,7 +57,21 @@ export function ShiftClock({
         return;
       }
 
-      coords = { latitude: result.coords.latitude, longitude: result.coords.longitude };
+      coords = {
+        latitude: result.coords.latitude,
+        longitude: result.coords.longitude,
+        isMock: result.coords.isMock,
+      };
+
+      // Refused here purely so the message is immediate and specific —
+      // clock_in() refuses a mocked fix again server-side, and records the
+      // attempt, so editing this out of the bundle changes nothing.
+      if (result.coords.isMock) {
+        setError('A fake GPS or mock-location app is running. Turn it off and try again.');
+        setStatus(null);
+        setBusy(false);
+        return;
+      }
 
       // Same check the database will run. Doing it here just turns a rejected
       // round trip into an immediate, specific explanation.

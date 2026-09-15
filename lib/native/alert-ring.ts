@@ -21,6 +21,14 @@ export type PermissionPromptResult = {
   requested: boolean;
 };
 
+export type VerifiedLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  /** Android's own verdict on the fix — true when a mock provider supplied it. */
+  isMock: boolean;
+};
+
 export interface AlertRingPlugin {
   start(options: AlertRingStartOptions): Promise<void>;
   stop(): Promise<void>;
@@ -32,6 +40,8 @@ export interface AlertRingPlugin {
   requestLocationPermissions(): Promise<{ granted: boolean }>;
   /** Opens ACTION_APPLICATION_DETAILS_SETTINGS — the only route back from a permanently denied permission. */
   openAppSettings(): Promise<{ opened: boolean }>;
+  /** A platform location fix plus Android's mock-provider verdict. Rejects with LOCATION_* codes. */
+  getVerifiedLocation(): Promise<VerifiedLocation>;
 }
 
 const AlertRing = registerPlugin<AlertRingPlugin>('AlertRing', {

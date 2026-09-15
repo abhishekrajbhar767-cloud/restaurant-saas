@@ -45,6 +45,55 @@ export async function getCurrentPosition(options: PositionOptions = DEFAULT_OPTI
   });
 }
 
+export type VerifiedCoords = Coords & { isMock: boolean };
+export type VerifiedGeolocationResult = { coords: VerifiedCoords } | { error: string };
+
+/**
+ * A fix carrying Android's mock-provider verdict, for clock-in.
+ *
+ * On a native build this goes through the platform LocationManager, which is
+ * the only place that flag exists — a fake GPS app is indistinguishable from
+ * a real one through navigator.geolocation. On the web it degrades to the
+ * ordinary browser fix with isMock false, because a browser genuinely cannot
+ * tell; the geofence and server-side clock still apply there.
+ */
+export async function getVerifiedPosition(): Promise<VerifiedGeolocationResult> {
+  if (typeof window !== 'undefined') {
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const denied = await requestNativeLocationPermission();
+        if (denied) return { error: denied };
+
+        const { AlertRing } = await import('@/lib/native/alert-ring');
+        const fix = await AlertRing.getVerifiedLocation();
+        return {
+          coords: {
+            latitude: fix.latitude,
+            longitude: fix.longitude,
+            accuracy: fix.accuracy,
+            isMock: fix.isMock,
+          },
+        };
+      }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code.includes('LOCATION_PERMISSION_DENIED')) {
+        return { error: 'Location permission was denied. Allow “While using the app” for Restaurant OS and try again.' };
+      }
+      if (code.includes('LOCATION_TIMEOUT')) {
+        return { error: 'Timed out waiting for your location. Step outside or near a window and try again.' };
+      }
+      // LOCATION_UNAVAILABLE / LOCATION_UNSUPPORTED and anything unexpected
+      // fall through to the browser path below rather than blocking clock-in.
+    }
+  }
+
+  const result = await getCurrentPosition();
+  if ('error' in result) return result;
+  return { coords: { ...result.coords, isMock: false } };
+}
+
 async function requestNativeLocationPermission(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   try {

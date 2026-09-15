@@ -4,10 +4,17 @@ import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
+import java.util.concurrent.atomic.AtomicBoolean;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -29,6 +36,11 @@ import com.getcapacitor.annotation.PermissionCallback;
     }
 )
 public class AlertRingPlugin extends Plugin {
+
+    // A cached fix older than this proves nothing about where the person is
+    // standing right now, so it is discarded in favour of a live one.
+    private static final long MAX_FIX_AGE_MS = 60_000L;
+    private static final long FIX_TIMEOUT_MS = 15_000L;
 
     @PluginMethod
     public void start(PluginCall call) {
@@ -141,6 +153,113 @@ public class AlertRingPlugin extends Plugin {
             return;
         }
         requestPermissionForAlias("location", call, "locationPermsCallback");
+    }
+
+    /**
+     * A location fix straight from the platform, carrying whether Android
+     * considers it mocked. The WebView's navigator.geolocation cannot answer
+     * that question — a fake GPS app looks identical through it — so
+     * clock-in reads the fix here instead and refuses a mocked one.
+     */
+    @PluginMethod
+    public void getVerifiedLocation(PluginCall call) {
+        if (!hasLocationPermission()) {
+            call.reject("LOCATION_PERMISSION_DENIED");
+            return;
+        }
+
+        LocationManager manager = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+        if (manager == null) {
+            call.reject("LOCATION_UNAVAILABLE");
+            return;
+        }
+
+        Location freshest = null;
+        try {
+            for (String provider : manager.getProviders(true)) {
+                Location candidate = manager.getLastKnownLocation(provider);
+                if (candidate == null) continue;
+                if (freshest == null || candidate.getTime() > freshest.getTime()) freshest = candidate;
+            }
+        } catch (SecurityException e) {
+            call.reject("LOCATION_PERMISSION_DENIED");
+            return;
+        }
+
+        if (freshest != null && System.currentTimeMillis() - freshest.getTime() <= MAX_FIX_AGE_MS) {
+            call.resolve(describeLocation(freshest));
+            return;
+        }
+
+        requestSingleFix(call, manager);
+    }
+
+    private void requestSingleFix(PluginCall call, LocationManager manager) {
+        Handler handler = new Handler(Looper.getMainLooper());
+        AtomicBoolean settled = new AtomicBoolean(false);
+
+        LocationListener listener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                if (!settled.compareAndSet(false, true)) return;
+                handler.removeCallbacksAndMessages(null);
+                removeUpdatesQuietly(manager, this);
+                call.resolve(describeLocation(location));
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            @Override
+            public void onProviderEnabled(String provider) {}
+
+            @Override
+            public void onProviderDisabled(String provider) {}
+        };
+
+        handler.post(() -> {
+            String provider = manager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                ? LocationManager.GPS_PROVIDER
+                : LocationManager.NETWORK_PROVIDER;
+
+            try {
+                manager.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper());
+            } catch (SecurityException e) {
+                if (settled.compareAndSet(false, true)) call.reject("LOCATION_PERMISSION_DENIED");
+                return;
+            } catch (IllegalArgumentException e) {
+                if (settled.compareAndSet(false, true)) call.reject("LOCATION_UNAVAILABLE");
+                return;
+            }
+
+            handler.postDelayed(() -> {
+                if (!settled.compareAndSet(false, true)) return;
+                removeUpdatesQuietly(manager, listener);
+                call.reject("LOCATION_TIMEOUT");
+            }, FIX_TIMEOUT_MS);
+        });
+    }
+
+    private void removeUpdatesQuietly(LocationManager manager, LocationListener listener) {
+        try {
+            manager.removeUpdates(listener);
+        } catch (SecurityException ignored) {
+            // Permission revoked mid-request; nothing left to clean up.
+        }
+    }
+
+    private JSObject describeLocation(Location location) {
+        JSObject ret = new JSObject();
+        ret.put("latitude", location.getLatitude());
+        ret.put("longitude", location.getLongitude());
+        ret.put("accuracy", location.getAccuracy());
+        ret.put("isMock", isMockLocation(location));
+        return ret;
+    }
+
+    private boolean isMockLocation(Location location) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return location.isMock();
+        return location.isFromMockProvider();
     }
 
     @PermissionCallback

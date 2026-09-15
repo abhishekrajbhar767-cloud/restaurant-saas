@@ -4,6 +4,7 @@ import type {
   AlertRingPlugin,
   AlertRingStartOptions,
   PermissionPromptResult,
+  VerifiedLocation,
 } from './alert-ring';
 
 // Browser fallback: the waiter's existing <audio> loop covers web. Native
@@ -44,6 +45,12 @@ export class AlertRingWeb extends WebPlugin implements AlertRingPlugin {
 
   async requestLocationPermissions(): Promise<{ granted: boolean }> {
     return { granted: true };
+  }
+
+  async getVerifiedLocation(): Promise<VerifiedLocation> {
+    // Browsers expose no mock-provider signal, so the web build cannot make
+    // this claim. Callers fall back to navigator.geolocation instead.
+    throw new Error('LOCATION_UNSUPPORTED');
   }
 
   async openAppSettings(): Promise<{ opened: boolean }> {

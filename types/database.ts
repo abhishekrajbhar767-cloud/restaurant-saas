@@ -51,6 +51,11 @@ export type Restaurant = {
   require_waiter_approval: boolean;
   inventory_tracking_enabled: boolean;
   recipe_auto_deduct_enabled: boolean;
+  // Attendance policy (0044). Grace is minutes past the member's assigned
+  // shift_start_time before a day is marked Late.
+  late_grace_minutes: number;
+  half_day_max_hours: number;
+  full_day_min_hours: number;
   created_at: string;
   updated_at: string;
 };
@@ -116,6 +121,11 @@ export type RestaurantMember = {
   phone: string | null;
   can_take_orders: boolean;
   can_handle_billing: boolean;
+  // Payroll terms (0044). Null means this member is not on payroll yet —
+  // attendance still reports, the payable just comes out as zero.
+  shift_start_time: string | null;
+  daily_wage: number | null;
+  monthly_salary: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -281,6 +291,70 @@ export type StaffShift = {
   clock_in_longitude: number | null;
 };
 
+// A refused clock-in. Written by record_clock_in_rejection() after clock_in()
+// has already raised — the raise would roll back anything that call wrote.
+export type ClockInAttempt = {
+  id: string;
+  restaurant_id: string;
+  staff_id: string;
+  attempted_at: string;
+  reason: 'mock_location' | 'outside_geofence';
+  latitude: number | null;
+  longitude: number | null;
+};
+
+// Present/Late/Half-day, as decided by get_attendance_report. A day too
+// short to count is Half-day even if the person also arrived late.
+export type AttendanceStatus = 'Present' | 'Late' | 'Half-day';
+
+// public.attendance_logs — a view over staff_shifts, one row per shift.
+export type AttendanceLog = {
+  id: string;
+  staff_id: string;
+  restaurant_id: string;
+  date: string;
+  clock_in_time: string;
+  clock_out_time: string | null;
+  total_hours: number;
+  status: AttendanceStatus;
+  orders_handled: number;
+  is_open: boolean;
+};
+
+// One row per staff member per worked day, split shifts already merged.
+export type AttendanceReportRow = {
+  staff_id: string;
+  display_name: string | null;
+  email: string;
+  role: MemberRole;
+  work_date: string;
+  first_clock_in: string;
+  last_clock_out: string | null;
+  total_hours: number;
+  status: AttendanceStatus;
+  orders_handled: number;
+  shift_start_time: string | null;
+  is_open: boolean;
+  flagged_mock: boolean;
+};
+
+export type PayrollSummaryRow = {
+  staff_id: string;
+  display_name: string | null;
+  email: string;
+  role: MemberRole;
+  present_days: number;
+  late_days: number;
+  half_days: number;
+  days_worked: number;
+  total_hours: number;
+  orders_handled: number;
+  daily_wage: number | null;
+  monthly_salary: number | null;
+  effective_daily_rate: number;
+  payable_amount: number;
+};
+
 export type EodSummary = {
   order_count: number;
   items_sold: number;
@@ -425,6 +499,9 @@ export type RestaurantStaffRow = {
   availability: WaiterAvailability | null;
   can_take_orders: boolean;
   can_handle_billing: boolean;
+  shift_start_time: string | null;
+  daily_wage: number | null;
+  monthly_salary: number | null;
 };
 
 // The transfer-target roster: on-duty waiters only, name only — narrower
@@ -490,6 +567,10 @@ export type Database = {
       inventory_items: { Row: InventoryItem; Insert: Partial<InventoryItem>; Update: Partial<InventoryItem>; Relationships: [] };
       menu_item_recipes: { Row: MenuItemRecipe; Insert: Partial<MenuItemRecipe>; Update: Partial<MenuItemRecipe>; Relationships: [] };
       inventory_logs: { Row: InventoryLog; Insert: Partial<InventoryLog>; Update: Partial<InventoryLog>; Relationships: [] };
+      // A view (0044), so reads only — writes go to staff_shifts via the
+      // clock_in/clock_out RPCs.
+      attendance_logs: { Row: AttendanceLog; Insert: never; Update: never; Relationships: [] };
+      clock_in_attempts: { Row: ClockInAttempt; Insert: never; Update: never; Relationships: [] };
     };
     Functions: {
       deduct_order_inventory: { Args: { p_order_id: string }; Returns: void };
@@ -549,7 +630,41 @@ export type Database = {
         };
         Returns: void;
       };
-      clock_in: { Args: { p_restaurant_id: string; p_latitude?: number | null; p_longitude?: number | null }; Returns: string };
+      clock_in: {
+        Args: {
+          p_restaurant_id: string;
+          p_latitude?: number | null;
+          p_longitude?: number | null;
+          p_is_mock?: boolean;
+        };
+        Returns: string;
+      };
+      record_clock_in_rejection: {
+        Args: {
+          p_restaurant_id: string;
+          p_reason: 'mock_location' | 'outside_geofence';
+          p_latitude?: number | null;
+          p_longitude?: number | null;
+        };
+        Returns: void;
+      };
+      set_staff_payroll: {
+        Args: {
+          p_member_id: string;
+          p_shift_start_time?: string | null;
+          p_daily_wage?: number | null;
+          p_monthly_salary?: number | null;
+        };
+        Returns: void;
+      };
+      get_attendance_report: {
+        Args: { p_restaurant_id: string; p_start_date: string; p_end_date: string };
+        Returns: AttendanceReportRow[];
+      };
+      get_payroll_summary: {
+        Args: { p_restaurant_id: string; p_start_date: string; p_end_date: string };
+        Returns: PayrollSummaryRow[];
+      };
       clock_out: { Args: { p_shift_id?: string | null }; Returns: void };
       get_active_shifts: { Args: { p_restaurant_id: string }; Returns: ActiveShiftRow[] };
       get_eod_summary: { Args: { p_restaurant_id: string; p_day?: string | null }; Returns: EodSummary };
