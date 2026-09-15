@@ -1,7 +1,6 @@
 import { LoginForm } from './login-form';
 
 const PORTALS = [
-  { role: 'Super Admin', desc: 'Platform-wide oversight' },
   { role: 'Owner & Manager', desc: 'Menu, tables, staff, revenue' },
   { role: 'Kitchen', desc: 'Live order queue' },
   { role: 'Waiter', desc: 'Floor requests & service' },
@@ -50,11 +49,6 @@ export default function LoginPage({ searchParams }: { searchParams: { redirect?:
           <p className="text-sm text-text-muted mb-8">Use the account your restaurant set up for you.</p>
 
           <LoginForm redirectTo={searchParams.redirect} />
-
-          <div className="mt-8 card px-4 py-3 text-xs text-text-muted">
-            <span className="font-mono text-amber">DEMO</span> — owner@urbanspice.demo /
-            kitchen@urbanspice.demo / waiter1@urbanspice.demo · password <span className="font-mono">Demo1234!</span>
-          </div>
         </div>
       </section>
     </main>
